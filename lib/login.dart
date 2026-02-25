@@ -11,10 +11,16 @@ class LoginPage extends StatelessWidget {
         decoration: BoxDecoration(color: Colors.red[100]),
         child: Column(
           children: [
-            Image.asset("assets/images/logo.png", height: 10),
+            ClipOval(
+              child: Image.asset(
+                "assets/images/logo.png",
+                height: 200,
+                width: 200, fit: BoxFit.cover),
+            ),
+            Text("Login Page", style: TextStyle(fontSize: 20, fontFamily: "Roboto-Bold", color: Color.fromARGB(255, 40, 75, 158)),),
             Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text("Login Page"),
                 Radio(value: "Manager"), Radio(value: "Worker"),
               ],
             ),
