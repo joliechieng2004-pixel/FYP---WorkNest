@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:worknest/login.dart';
+//import 'package:worknest/register.dart';
 import 'firebase_options.dart';
-//import 'package:flutter_application_1/manager_screens/manager_home.dart';
-import 'package:worknest/splash.dart';
-//import 'package:flutter_application_1/login.dart';
+//import 'package:worknest/manager_screens/manager_home.dart';
+//import 'package:worknest/splash.dart';
 
 void main() async {
   // 1. This line ensures all Flutter widgets are loaded before starting Firebase
@@ -25,9 +26,9 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(fontFamily: 'OpenSans'),
-      home: const SplashScreen(),
-      //home: const LoginPage(),
+      theme: ThemeData(fontFamily: 'Roboto'),
+      //home: const SplashScreen(),
+      home: const LoginPage(),
     );
   }
 }
