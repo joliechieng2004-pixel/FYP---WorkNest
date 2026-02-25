@@ -8,31 +8,34 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
+  String _selectedRole = "employee";
+
   @override
   Widget build(BuildContext context) {
-    String _selectedRole = "employee";
-
     return Scaffold(
-      body: Container(
-        margin: EdgeInsets.only(left: 40, right: 40, top: 60, bottom: 10),
-        child: Column(
-          children: [
-            SizedBox(height: 20),
-            LoginLogo(),
-            SizedBox(height: 20),
-            Text("LOGIN PAGE", style: TextStyle(fontSize: 30, fontWeight:FontWeight.bold, fontFamily: "Roboto-Bold", color: Color.fromARGB(255, 40, 75, 158)),),
-            SizedBox(height: 20),
-            Column(
-              children: [
-                LoginRadioButton(_selectedRole),
-                SizedBox(height: 10),
-                LoginForm(),
-              ],
-            ),
-            SizedBox(height: 30),
-            LoginLoginButton(),
-            LoginRegisterButton(),
-          ]
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: EdgeInsets.symmetric(horizontal: 40),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(height: 20),
+              LoginLogo(),
+              SizedBox(height: 20),
+              Text("LOGIN PAGE", style: TextStyle(fontSize: 30, fontWeight:FontWeight.bold, fontFamily: "Roboto-Bold", color: Color.fromARGB(255, 40, 75, 158)),),
+              SizedBox(height: 20),
+              Column(
+                children: [
+                  LoginRadioButton(),
+                  SizedBox(height: 10),
+                  LoginForm(),
+                ],
+              ),
+              SizedBox(height: 30),
+              LoginLoginButton(),
+              LoginRegisterButton(),
+            ]
+          )
         )
       )
     );
@@ -40,7 +43,7 @@ class _LoginPageState extends State<LoginPage> {
 
   TextButton LoginRegisterButton() {
     return TextButton(
-      onPressed: Register,
+      onPressed: goRegister,
       child: Text(
         'Register New Account',
         style: TextStyle(
@@ -77,7 +80,11 @@ class _LoginPageState extends State<LoginPage> {
             labelText: 'e.g. T001',
             enabledBorder: OutlineInputBorder(
               borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
-              borderRadius: BorderRadius.circular(20))
+              borderRadius: BorderRadius.circular(20)),
+            focusedBorder: OutlineInputBorder(
+              borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+              borderRadius: BorderRadius.circular(20)
+              ),
           ),
         ),
         SizedBox(height: 10),
@@ -87,7 +94,11 @@ class _LoginPageState extends State<LoginPage> {
             labelText: 'e.g. example@mail.com',
             enabledBorder: OutlineInputBorder(
               borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
-              borderRadius: BorderRadius.circular(20))
+              borderRadius: BorderRadius.circular(20)),
+            focusedBorder: OutlineInputBorder(
+              borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+              borderRadius: BorderRadius.circular(20)
+              ),
           ),
         ),
         SizedBox(height: 10),
@@ -98,8 +109,11 @@ class _LoginPageState extends State<LoginPage> {
             labelText: 'At least 8 characters',
             enabledBorder: OutlineInputBorder(
               borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+              borderRadius: BorderRadius.circular(20)),
+            focusedBorder: OutlineInputBorder(
+              borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
               borderRadius: BorderRadius.circular(20)
-            ),
+              )
           ),
         ),
       ],
@@ -115,7 +129,7 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Row LoginRadioButton(String _selectedRole) {
+  Row LoginRadioButton() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center, // Centers the group
       children: [
@@ -154,7 +168,7 @@ class _LoginPageState extends State<LoginPage> {
     print("Logging In...");
   }
 
-  void Register() {
+  void goRegister() {
     print("Redirecting to Register Page...");
   }
 }

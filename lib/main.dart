@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:worknest/login.dart';
-//import 'package:worknest/register.dart';
+//import 'package:worknest/login.dart';
+import 'package:worknest/register.dart';
 import 'firebase_options.dart';
-//import 'package:worknest/manager_screens/manager_home.dart';
+//import 'package:worknest/manager/manager_home.dart';
 //import 'package:worknest/splash.dart';
 
 void main() async {
@@ -28,7 +28,7 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(fontFamily: 'Roboto'),
       //home: const SplashScreen(),
-      home: const LoginPage(),
+      home: const RegisterPage(),
     );
   }
 }
