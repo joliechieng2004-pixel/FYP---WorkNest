@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:worknest/services/auth_service.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -8,11 +9,21 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
+  final AuthService _authService = AuthService();
+  
   String _selectedRole = "employee";
+
   final TextEditingController _deptCodeController = TextEditingController(); // Only for Managers or joining
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
 
+  @override
+  void dispose() {
+    _deptCodeController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -63,7 +74,7 @@ class _LoginPageState extends State<LoginPage> {
         backgroundColor: Color.fromARGB(255, 40, 75, 158),
         foregroundColor: Colors.white
       ),
-      onPressed: Login,
+      onPressed: _handleLogin,
       child: Text(
         "Login",
         style: TextStyle(
@@ -171,9 +182,33 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  void Login() {
-    print("Logging In...");
+  void _handleLogin() async {
+  // 1. Get values from controllers and the radio button
+  String enteredEmail = _emailController.text.trim();
+  String enteredPassword = _passwordController.text.trim();
+  String enteredDeptCode = _deptCodeController.text.trim();
+  String selectedRole = _selectedRole; // This is the value from your Radio buttons!
+
+  // 2. Call AuthService (Updated to check role too)
+  String? result = await _authService.loginUser(
+    email: enteredEmail,
+    password: enteredPassword,
+    deptCode: enteredDeptCode,
+    expectedRole: selectedRole, // Pass the radio button value here
+  );
+
+  if (result == null) {
+     // Success! Navigate based on the radio button value
+     if (selectedRole == 'manager') {
+       Navigator.pushReplacementNamed(context, '/manager_home');
+     } else {
+       Navigator.pushReplacementNamed(context, '/employee_home');
+     }
+  } else {
+     // Show error from SnackBar
+     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result)));
   }
+}
 
   void goRegister() {
     Navigator.pushReplacementNamed(context, '/register');

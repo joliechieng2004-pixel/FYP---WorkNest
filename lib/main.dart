@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:worknest/employee/employee_home.dart';
 import 'package:worknest/login.dart';
+import 'package:worknest/manager/manager_home.dart';
 import 'package:worknest/register.dart';
 import 'firebase_options.dart';
 //import 'package:worknest/manager/manager_home.dart';
@@ -27,10 +29,12 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData(fontFamily: 'Roboto'),
-      initialRoute: '/register',
+      initialRoute: '/login',
       routes: {
         '/login': (context) => const LoginPage(), // Make sure this line exists!
         '/register': (context) => const RegisterPage(),
+        '/manager_home': (context) => const ManagerHome(),
+        '/employee_home': (context) => const EmployeeHome()
       },
     );
   }

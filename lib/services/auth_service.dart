@@ -113,33 +113,43 @@ class AuthService {
     return 'Employee creation failed';
   }
 
-  // 4. LOGIN USER & GET ROLE
-  Future<Map<String, dynamic>?> loginUser({
+  // 4. LOGIN USER WITH DEPT CODE VERIFICATION
+  // Change the return type from Map? to String?
+  Future<String?> loginUser({
     required String email,
     required String password,
+    required String deptCode,
+    required String expectedRole,
   }) async {
     try {
-      // Step A: Sign in with Auth
+      // 1. Authenticate
       UserCredential result = await _auth.signInWithEmailAndPassword(
         email: email, 
         password: password
       );
 
       if (result.user != null) {
-        // Step B: Fetch the user document from Firestore
-        DocumentSnapshot doc = await _db.collection('users').doc(result.user!.uid).get();
-        
-        if (doc.exists) {
-          return {
-            'role': doc.get('userRole'),
-            'uid': result.user!.uid,
-            'deptCode': doc.get('deptCode'),
-          };
+        // 2. Fetch Firestore Profile
+        DocumentSnapshot userDoc = await _db.collection('users').doc(result.user!.uid).get();
+
+        if (userDoc.exists) {
+          String actualDeptCode = userDoc.get('deptCode');
+          String actualRole = userDoc.get('userRole');
+
+          // 3. Check if Dept Code and Role match the Radio Button/Input
+          if (actualDeptCode == deptCode && actualRole == expectedRole) {
+            return null; // SUCCESS (No error message)
+          } else {
+            await _auth.signOut();
+            return "Incorrect Department Code or User Role selected.";
+          }
         }
       }
+      return "User profile not found.";
     } on FirebaseAuthException catch (e) {
-      throw e.message ?? "An error occurred";
+      return e.message; // Return the Firebase error (e.g., "Wrong password")
+    } catch (e) {
+      return e.toString();
     }
-    return null;
   }
 }
