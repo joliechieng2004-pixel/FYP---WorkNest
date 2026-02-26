@@ -9,6 +9,10 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   String _selectedRole = "employee";
+  final TextEditingController _deptCodeController = TextEditingController(); // Only for Managers or joining
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+
 
   @override
   Widget build(BuildContext context) {
@@ -76,6 +80,7 @@ class _LoginPageState extends State<LoginPage> {
       children: [
         Text("Department Code:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
         TextFormField(
+          controller: _deptCodeController,
           decoration: InputDecoration(
             labelText: 'e.g. T001',
             enabledBorder: OutlineInputBorder(
@@ -90,6 +95,7 @@ class _LoginPageState extends State<LoginPage> {
         SizedBox(height: 10),
         Text("Email:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
         TextFormField(
+          controller: _emailController,
           decoration: InputDecoration(
             labelText: 'e.g. example@mail.com',
             enabledBorder: OutlineInputBorder(
@@ -104,6 +110,7 @@ class _LoginPageState extends State<LoginPage> {
         SizedBox(height: 10),
         Text("Password:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
         TextFormField(
+          controller: _passwordController,
           obscureText: true,
           decoration: InputDecoration(
             labelText: 'At least 8 characters',
@@ -169,6 +176,6 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void goRegister() {
-    print("Redirecting to Register Page...");
+    Navigator.pushReplacementNamed(context, '/register');
   }
 }

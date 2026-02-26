@@ -1,4 +1,6 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:worknest/services/auth_service.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -8,6 +10,29 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> {
+  final TextEditingController _deptNameController = TextEditingController();
+  final TextEditingController _fNameController = TextEditingController();
+  final TextEditingController _lNameController = TextEditingController();
+  final TextEditingController _contactController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _confirmPasswordController = TextEditingController();
+
+  final AuthService _authService = AuthService(); // Initialize Service
+
+  @override
+  void dispose() {
+    // 2. Clean up memory
+    _deptNameController.dispose();
+    _fNameController.dispose();
+    _lNameController.dispose();
+    _contactController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -52,7 +77,7 @@ class _RegisterPageState extends State<RegisterPage> {
         backgroundColor: Color.fromARGB(255, 40, 75, 158),
         foregroundColor: Colors.white
       ),
-      onPressed: Register,
+      onPressed: _handleRegister,
       child: Text(
         "Register Account",
         style: TextStyle(
@@ -69,6 +94,7 @@ class _RegisterPageState extends State<RegisterPage> {
       children: [
         Text("Department Name:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
         TextFormField(
+          controller: _deptNameController,
           decoration: InputDecoration(
             labelText: 'e.g. IT Department',
             enabledBorder: OutlineInputBorder(
@@ -83,6 +109,7 @@ class _RegisterPageState extends State<RegisterPage> {
         SizedBox(height: 10),
         Text("First Name:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
         TextFormField(
+          controller: _fNameController,
           decoration: InputDecoration(
             labelText: 'e.g. John (Given Name)',
             enabledBorder: OutlineInputBorder(
@@ -97,6 +124,7 @@ class _RegisterPageState extends State<RegisterPage> {
         SizedBox(height: 10),
         Text("Last Name:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
         TextFormField(
+          controller: _lNameController,
           decoration: InputDecoration(
             labelText: 'e.g. Lim (Family Name)',
             enabledBorder: OutlineInputBorder(
@@ -111,6 +139,7 @@ class _RegisterPageState extends State<RegisterPage> {
         SizedBox(height: 10),
         Text("Contact Number:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
         TextFormField(
+          controller: _contactController,
           decoration: InputDecoration(
             labelText: 'e.g. 0123456789',
             enabledBorder: OutlineInputBorder(
@@ -125,6 +154,7 @@ class _RegisterPageState extends State<RegisterPage> {
         SizedBox(height: 10),
         Text("Email:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
         TextFormField(
+          controller: _emailController,
           decoration: InputDecoration(
             labelText: 'e.g. example@mail.com',
             enabledBorder: OutlineInputBorder(
@@ -139,6 +169,7 @@ class _RegisterPageState extends State<RegisterPage> {
         SizedBox(height: 10),
         Text("Password:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
         TextFormField(
+          controller: _passwordController,
           obscureText: true,
           decoration: InputDecoration(
             labelText: 'At least 8 characters',
@@ -154,6 +185,7 @@ class _RegisterPageState extends State<RegisterPage> {
         SizedBox(height: 10),
         Text("Confirm Password:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
         TextFormField(
+          controller: _confirmPasswordController,
           obscureText: true,
           decoration: InputDecoration(
             labelText: 'Re-enter your password',
@@ -170,11 +202,53 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
-  void Register() {
-    print("Registering...");
+  void _handleRegister() async {
+    // Basic Validation (Password & Confirm Password)
+    // TODO: validate email
+    if (_passwordController.text != _confirmPasswordController.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Passwords do not match!")),
+      );
+      return;
+    }
+
+    // Show loading circle (Optional but recommended)
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    // Call the service
+    String? result = await _authService.registerManager(
+      deptName: _deptNameController.text.trim(),
+      fName: _fNameController.text.trim(),
+      lName: _lNameController.text.trim(),
+      contact: _contactController.text.trim(),
+      email: _emailController.text.trim(),
+      password: _passwordController.text.trim(),
+      officeLocation: const GeoPoint(0, 0),
+    );
+
+    Navigator.pop(context); // Remove loading circle
+
+    if (result == null) {
+      // SUCCESS!
+      ScaffoldMessenger.of(context).showSnackBar(
+        // TODO: change duration for better experience
+        const SnackBar(content: Text("Account Created Successfully!")),
+      );
+      // Navigate to Login or Dashboard
+      Navigator.pushReplacementNamed(context, '/login'); 
+    } else {
+      // ERROR (e.g., email already in use)
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result)),
+      );
+    }
   }
 
   void goLogin() {
-    print("Redirecting to Login Page...");
+    Navigator.pushReplacementNamed(context, '/login');
   }
 }
