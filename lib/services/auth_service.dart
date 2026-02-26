@@ -112,4 +112,34 @@ class AuthService {
     }
     return 'Employee creation failed';
   }
+
+  // 4. LOGIN USER & GET ROLE
+  Future<Map<String, dynamic>?> loginUser({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      // Step A: Sign in with Auth
+      UserCredential result = await _auth.signInWithEmailAndPassword(
+        email: email, 
+        password: password
+      );
+
+      if (result.user != null) {
+        // Step B: Fetch the user document from Firestore
+        DocumentSnapshot doc = await _db.collection('users').doc(result.user!.uid).get();
+        
+        if (doc.exists) {
+          return {
+            'role': doc.get('userRole'),
+            'uid': result.user!.uid,
+            'deptCode': doc.get('deptCode'),
+          };
+        }
+      }
+    } on FirebaseAuthException catch (e) {
+      throw e.message ?? "An error occurred";
+    }
+    return null;
+  }
 }
