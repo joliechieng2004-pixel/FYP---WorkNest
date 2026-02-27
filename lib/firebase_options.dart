@@ -17,10 +17,7 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      throw UnsupportedError(
-        'DefaultFirebaseOptions have not been configured for web - '
-        'you can reconfigure this by running the FlutterFire CLI again.',
-      );
+      return web;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -28,15 +25,9 @@ class DefaultFirebaseOptions {
       case TargetPlatform.iOS:
         return ios;
       case TargetPlatform.macOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for macos - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return macos;
       case TargetPlatform.windows:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for windows - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return windows;
       case TargetPlatform.linux:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for linux - '
@@ -65,4 +56,34 @@ class DefaultFirebaseOptions {
     storageBucket: 'flutter-fyp-14b4c.firebasestorage.app',
     iosBundleId: 'com.example.worknest',
   );
+
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyBQ04Y2Sh0HYSorRDpHQAjmnV0t_HgGuD8',
+    appId: '1:1080872204170:web:1b7cc9432af52063d07a73',
+    messagingSenderId: '1080872204170',
+    projectId: 'flutter-fyp-14b4c',
+    authDomain: 'flutter-fyp-14b4c.firebaseapp.com',
+    storageBucket: 'flutter-fyp-14b4c.firebasestorage.app',
+    measurementId: 'G-8VMNC8EVWE',
+  );
+
+  static const FirebaseOptions macos = FirebaseOptions(
+    apiKey: 'AIzaSyAZEw9xvqfnMQFjEvA2qeM8GNMK8MwxaHY',
+    appId: '1:1080872204170:ios:25b782d4ed0b7467d07a73',
+    messagingSenderId: '1080872204170',
+    projectId: 'flutter-fyp-14b4c',
+    storageBucket: 'flutter-fyp-14b4c.firebasestorage.app',
+    iosBundleId: 'com.example.worknest',
+  );
+
+  static const FirebaseOptions windows = FirebaseOptions(
+    apiKey: 'AIzaSyBo-QViqF_6xaDFhXkJodEK3sj2kiuYPzY',
+    appId: '1:1080872204170:web:9a002cbb005cc933d07a73',
+    messagingSenderId: '1080872204170',
+    projectId: 'flutter-fyp-14b4c',
+    authDomain: 'flutter-fyp-14b4c.firebaseapp.com',
+    storageBucket: 'flutter-fyp-14b4c.firebasestorage.app',
+    measurementId: 'G-3JWJ5057BL',
+  );
+
 }
