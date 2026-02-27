@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 class ManagerHome extends StatefulWidget {
   const ManagerHome({super.key});
@@ -10,8 +11,14 @@ class ManagerHome extends StatefulWidget {
 }
 
 class _ManagerHomePageState extends State<ManagerHome> {
-  String deptName = "Loading...";
+  final Color primaryBlue = const Color.fromARGB(255, 40, 75, 158);
+  final Color bgLightBlue = const Color.fromARGB(255, 240, 250, 255);
+  
   String deptCode = "Loading...";
+  String lName = "Name";
+  
+  String formattedDate = DateFormat('EEEE, d MMM yyyy').format(DateTime.now());
+  String formattedTime = DateFormat('h:mm a').format(DateTime.now());
 
   @override
   void initState() {
@@ -29,46 +36,155 @@ class _ManagerHomePageState extends State<ManagerHome> {
           .get();
           
       setState(() {
-        deptName = userDoc['userRole']; // Or fetch from the departments collection
         deptCode = userDoc['deptCode'];
+        lName = userDoc['userLName'];
       });
     }
+  }
+
+  // Helper for Cards
+  Widget _buildCard({required Widget child, Color? color}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      margin: const EdgeInsets.symmetric(vertical: 10),
+      decoration: BoxDecoration(
+        color: color ?? Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: primaryBlue, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.blueGrey,
+            blurRadius: 10,
+            offset: const Offset(2, 4),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+
+  // Helper for Activity Items
+  Widget _buildActivityItem(String title) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade300),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color.fromARGB(255, 240, 250, 255),
-      appBar: AppBar(
-        title: const Text("Welcome back, Manager!", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-        centerTitle: true,
-        backgroundColor: Color.fromARGB(255, 240, 250, 255),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () {
-              FirebaseAuth.instance.signOut();
-              Navigator.pushReplacementNamed(context, '/login');
-            },
-          )
-        ],
-      ),
+      backgroundColor: bgLightBlue,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(horizontal: 40),
+          padding: EdgeInsets.symmetric(horizontal: 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+
+              // --- Top Greeting Row ---
+              Row(
+                children: [
+                  Expanded(
+                    flex: 9,
+                    child: Text(
+                      "Hi, Manager $lName", 
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
+                  ),
+                  Expanded(
+                    flex: 1,
+                    child: IconButton.outlined(
+                      icon: Icon(Icons.logout, color: primaryBlue),
+                      onPressed: () {
+                        FirebaseAuth.instance.signOut();
+                        Navigator.pushReplacementNamed(context, '/login');
+                      },
+                    ),
+                  ),
+                ]),
+
               const SizedBox(height: 10),
           
-              // --- Clock In ---
-              ManagerClockIn(),
-              // --- Summary Card ---
-              ManagerSummaryCard(),
-              // --- Activities ---
-              ManagerActivities(),
-              // --- Department Code Card ---
-              DepartmentCodeCard(),
+              // 1. Dept Code Card
+              _buildCard(
+                color: Colors.blue.shade50,
+                child: Row(
+                  children: [
+                    Expanded(
+                      flex: 5,
+                      child: const Text(
+                        "Department Code:",
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold))),
+                    Expanded(
+                      flex: 5,
+                      child: SelectableText(
+                        deptCode, 
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: primaryBlue,
+                          letterSpacing: 5),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // 2. Clock In Card
+              _buildCard(
+                child: Column(
+                  children: [
+                    Text(formattedDate, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    Text(formattedTime, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 5),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF00C2A0), // Teal Green
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(250, 50),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                      ),
+                      onPressed: _clockIn,
+                      child: const Text("Clock In", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    )
+                  ],
+                ),
+              ),
+
+              // 3. Summary Card
+              _buildCard(
+                child: Column(
+                  children: [
+                    _buildStatRow("Today's Employee", "20"),
+                    _buildStatRow("Attendance Rate", "90%"),
+                    _buildStatRow("Pending Approval", "10"),
+                  ],
+                ),
+              ),
+
+              // 4. Activities Card (Scrollable)
+              _buildCard(
+                child: Column(
+                  children: [
+                    const Text("Activities", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      height: 150, // Fixed height for scrollable area
+                      child: ListView.builder(
+                        itemCount: 4,
+                        itemBuilder: (context, index) => _buildActivityItem("Activity ${index + 1}"),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
@@ -76,214 +192,29 @@ class _ManagerHomePageState extends State<ManagerHome> {
     );
   }
 
-  Container DepartmentCodeCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      margin: EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Colors.blue.shade50,
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: const Color.fromARGB(255, 40, 75, 158)),
-      ),
-      child: Column(
+  // Helper for Summary Rows
+  Widget _buildStatRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          const Text("Your Department Code", style: TextStyle(fontSize: 16)),
-          const SizedBox(height: 10),
-          SelectableText(
-            deptCode, 
-            style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Color.fromARGB(255, 40, 75, 158), letterSpacing: 5),
+          Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          Container(
+            width: 60,
+            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+            decoration: BoxDecoration(
+              border: Border.all(color: primaryBlue),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(value, textAlign: TextAlign.center, style: TextStyle(color: primaryBlue, fontWeight: FontWeight.bold)),
           ),
-          const Text("(Share this with your employees)", style: TextStyle(fontSize: 12, color: Colors.grey)),
         ],
       ),
     );
   }
 
-  Container ManagerActivities() {
-    return Container(
-      padding: const EdgeInsets.all(15),
-      margin: EdgeInsets.all(10),
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: const Color.fromARGB(255, 40, 75, 158), width: 3),
-      ),
-      child: Column(
-        children: [
-          Text(
-            "Activities",
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold
-            )
-          ),
-          Container(
-            padding: EdgeInsets.all(5),
-            margin: EdgeInsets.all(3),
-            width: double.infinity,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(7),
-              border: Border.all(color: Colors.grey)
-            ),
-            child: Text("Activity 1", style: TextStyle(fontWeight: FontWeight.bold),),
-          ),
-          Container(
-            padding: EdgeInsets.all(5),
-            margin: EdgeInsets.all(3),
-            width: double.infinity,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(7),
-              border: Border.all(color: Colors.grey)
-            ),
-            child: Text("Activity 2", style: TextStyle(fontWeight: FontWeight.bold),),
-          ),
-          Container(
-            padding: EdgeInsets.all(5),
-            margin: EdgeInsets.all(3),
-            width: double.infinity,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(7),
-              border: Border.all(color: Colors.grey)
-            ),
-            child: Text("Activity 3", style: TextStyle(fontWeight: FontWeight.bold),),
-          ),
-          Container(
-            padding: EdgeInsets.all(5),
-            margin: EdgeInsets.all(3),
-            width: double.infinity,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(7),
-              border: Border.all(color: Colors.grey)
-            ),
-            child: Text("Activity 4", style: TextStyle(fontWeight: FontWeight.bold),),
-          )
-        ],
-      )
-    );
-  }
-
-  Container ManagerSummaryCard() {
-    return Container(
-      padding: const EdgeInsets.all(15),
-      margin: EdgeInsets.all(10),
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: const Color.fromARGB(255, 40, 75, 158), width: 3),
-      ),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                "Today's Employee",
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold)
-                  ),
-              Container(
-                padding: EdgeInsets.only(left: 15, right: 15, top: 7, bottom: 7),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(7),
-                  border: Border.all(color: const Color.fromARGB(255, 40, 75, 158), width: 2),
-                ),
-                child: Text("20", style: TextStyle(),)
-                ),
-            ],
-          ),
-          SizedBox(height: 4),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                "Attendance Rate",
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold)),
-              Container(
-                padding: EdgeInsets.only(left: 15, right: 15, top: 7, bottom: 7),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(7),
-                  border: Border.all(color: const Color.fromARGB(255, 40, 75, 158), width: 2),
-                ),
-                child: Text("10", style: TextStyle(),)
-                ),
-            ],
-          ),
-          SizedBox(height: 4),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                "Pending Approval",
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold)),
-              Container(
-                padding: EdgeInsets.only(left: 15, right: 15, top: 7, bottom: 7),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(7),
-                  border: Border.all(color: const Color.fromARGB(255, 40, 75, 158), width: 2),
-                ),
-                child: Text("10", style: TextStyle(),)
-                ),
-            ],
-          ),
-        ],
-      )
-    );
-  }
-
-  Container ManagerClockIn() {
-    return Container(
-      padding: const EdgeInsets.all(15),
-      margin: EdgeInsets.all(10),
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: const Color.fromARGB(255, 40, 75, 158), width: 3),
-      ),
-      child: Column(
-        children: [
-          Text(
-            "Date",
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold)
-              ),
-          Text(
-            "Time",
-            style: TextStyle(
-              fontSize: 30,
-              fontWeight: FontWeight.bold)),
-          SizedBox(
-            width: 250,
-            height:50,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                foregroundColor: Colors.black,
-              ),
-              onPressed: _clockIn,
-              child: Text(
-                "Clock In",
-                style: TextStyle(
-                fontSize: 20,
-                fontWeight:FontWeight.w800
-              )
-              )
-            ),
-          )
-        ],
-      )
-    );
-  }
-
-  void _clockIn(){
+  void _clockIn() {
     print("Clocked In");
   }
 }

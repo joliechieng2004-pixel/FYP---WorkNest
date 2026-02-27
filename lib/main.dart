@@ -29,7 +29,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData(fontFamily: 'Roboto'),
-      initialRoute: '/manager_home',
+      initialRoute: '/login',
       routes: {
         '/login': (context) => const LoginPage(), // Make sure this line exists!
         '/register': (context) => const RegisterPage(),
