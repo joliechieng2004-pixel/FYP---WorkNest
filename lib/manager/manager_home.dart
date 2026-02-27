@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:worknest/services/auth_service.dart';
+import 'package:geolocator/geolocator.dart';
 
 class ManagerHome extends StatefulWidget {
   const ManagerHome({super.key});
@@ -11,12 +13,22 @@ class ManagerHome extends StatefulWidget {
 }
 
 class _ManagerHomePageState extends State<ManagerHome> {
+  final AuthService _authService = AuthService();
+
   final Color primaryBlue = const Color.fromARGB(255, 40, 75, 158);
   final Color bgLightBlue = const Color.fromARGB(255, 240, 250, 255);
   
+  final ScrollController _activityScrollController = ScrollController();
   String deptCode = "Loading...";
   String lName = "Name";
   
+  // Example: Coordinates for your office
+  // TODO: change to manager provided location
+  // TODO: let manager provide radius allowed
+  final double officeLat = 3.1454078; 
+  final double officeLng = 101.5801203;
+  final double maxDistanceInMeters = 100.0; // The radius allowed (m)
+
   String formattedDate = DateFormat('EEEE, d MMM yyyy').format(DateTime.now());
   String formattedTime = DateFormat('h:mm a').format(DateTime.now());
 
@@ -24,6 +36,12 @@ class _ManagerHomePageState extends State<ManagerHome> {
   void initState() {
     super.initState();
     _loadManagerData();
+  }
+
+  @override
+  void dispose() {
+    _activityScrollController.dispose(); // Clean up the controller
+    super.dispose();
   }
 
   // Fetch the current manager's department details
@@ -64,6 +82,28 @@ class _ManagerHomePageState extends State<ManagerHome> {
     );
   }
 
+  // Helper for Summary Rows
+  Widget _buildStatRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          Container(
+            width: 60,
+            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+            decoration: BoxDecoration(
+              border: Border.all(color: primaryBlue),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(value, textAlign: TextAlign.center, style: TextStyle(color: Colors.blueGrey, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   // Helper for Activity Items
   Widget _buildActivityItem(String title) {
     return Container(
@@ -75,6 +115,29 @@ class _ManagerHomePageState extends State<ManagerHome> {
       ),
       child: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
     );
+  }
+
+  Future<Position?> _getCurrentLocation() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    // 1. Check if location services are enabled
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return Future.error('Location services are disabled.');
+
+    // 2. Check/Request permissions
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) return Future.error('Location permissions are denied');
+    }
+    
+    if (permission == LocationPermission.deniedForever) {
+      return Future.error('Location permissions are permanently denied.');
+    }
+
+    // 3. Get the current position
+    return await Geolocator.getCurrentPosition();
   }
 
   @override
@@ -169,17 +232,34 @@ class _ManagerHomePageState extends State<ManagerHome> {
                 ),
               ),
 
-              // 4. Activities Card (Scrollable)
+              // 4. Activities Card (Scrollable Version)
+              // TODO: link employee's activity within the activity card
               _buildCard(
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text("Activities", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    const Center(
+                      child: Text(
+                        "Activities", 
+                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
+                      ),
+                    ),
                     const SizedBox(height: 10),
+                    
+                    // Fixed height container to enable internal scrolling
                     SizedBox(
-                      height: 150, // Fixed height for scrollable area
-                      child: ListView.builder(
-                        itemCount: 4,
-                        itemBuilder: (context, index) => _buildActivityItem("Activity ${index + 1}"),
+                      height: 150, // Set the height you want for the scrollable area
+                      child: Scrollbar(
+                        controller: _activityScrollController,
+                        thumbVisibility: true, // Makes the scrollbar visible like in your design
+                        child: ListView.builder(
+                          controller: _activityScrollController,
+                          padding: const EdgeInsets.only(right: 10), // Space for the scrollbar
+                          itemCount: 10, // Replace with your actual list length later
+                          itemBuilder: (context, index) {
+                            return _buildActivityItem("Activity ${index + 1}");
+                          },
+                        ),
                       ),
                     ),
                   ],
@@ -192,29 +272,56 @@ class _ManagerHomePageState extends State<ManagerHome> {
     );
   }
 
-  // Helper for Summary Rows
-  Widget _buildStatRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          Container(
-            width: 60,
-            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
-            decoration: BoxDecoration(
-              border: Border.all(color: primaryBlue),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(value, textAlign: TextAlign.center, style: TextStyle(color: primaryBlue, fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
+  void _clockIn() async {
+  User? user = FirebaseAuth.instance.currentUser;
 
-  void _clockIn() {
-    print("Clocked In");
+  if (user != null) {
+    try {
+      showDialog(context: context, builder: (context) => const Center(child: CircularProgressIndicator()));
+
+      // 1. Get User's Current GPS Position
+      Position position = await _getCurrentLocation() ?? await Geolocator.getCurrentPosition();
+      
+      // 2. Calculate Distance from Office
+      double distanceInMeters = Geolocator.distanceBetween(
+        position.latitude, 
+        position.longitude, 
+        officeLat, 
+        officeLng
+      );
+
+      // 3. Check if user is within the allowed radius (e.g., 100m)
+      if (distanceInMeters <= maxDistanceInMeters) {
+        // Success: User is at the office
+        GeoPoint currentGeoPoint = GeoPoint(position.latitude, position.longitude);
+
+        String? error = await _authService.clockInUser(
+          uid: user.uid,
+          deptCode: deptCode,
+          location: currentGeoPoint,
+        );
+
+        Navigator.pop(context); // Close loading
+
+        if (error == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Clock-in successful! You are on-site."), backgroundColor: Colors.green)
+          );
+        }
+      } else {
+        // Failure: User is too far away
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Clock-in failed. You are ${distanceInMeters.toStringAsFixed(0)}m away from the office."),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+    }
   }
+}
 }

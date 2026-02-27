@@ -3,6 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:math';
 
+import 'package:intl/intl.dart';
+
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -148,6 +150,36 @@ class AuthService {
       return "User profile not found.";
     } on FirebaseAuthException catch (e) {
       return e.message; // Return the Firebase error (e.g., "Wrong password")
+    } catch (e) {
+      return e.toString();
+    }
+  }
+
+  Future<String?> clockInUser({
+    required String uid,
+    required String deptCode,
+    required GeoPoint location,
+  }) async {
+    try {
+      // 1. Create a unique ID for the day (e.g., 2026-02-27_UserID)
+      String dateId = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      String docId = "${dateId}_$uid";
+
+      // 2. Reference the document
+      DocumentReference docRef = _db.collection('attendances').doc(docId);
+
+      // 3. Set the data matching your fields
+      await docRef.set({
+        'attendanceDate': DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day), // Midnight of today
+        'attendanceStartTime': FieldValue.serverTimestamp(),
+        'attendanceEndTime': null, // Empty until they clock out
+        'attendanceLocation': location, // Placeholder for now
+        'attendanceStatus': "Present",
+        'attendanceUserID': uid,
+        'deptCode': deptCode, // Crucial for Manager filtering
+      });
+      
+      return null; // Success
     } catch (e) {
       return e.toString();
     }
