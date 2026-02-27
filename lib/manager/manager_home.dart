@@ -25,8 +25,8 @@ class _ManagerHomePageState extends State<ManagerHome> {
   // Example: Coordinates for your office
   // TODO: change to manager provided location
   // TODO: let manager provide radius allowed
-  final double officeLat = 3.1454078; 
-  final double officeLng = 101.5801203;
+  final double officeLat = 37.421983;
+  final double officeLng = -122.084049;
   final double maxDistanceInMeters = 100.0; // The radius allowed (m)
 
   String formattedDate = DateFormat('EEEE, d MMM yyyy').format(DateTime.now());
