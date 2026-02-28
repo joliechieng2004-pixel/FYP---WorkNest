@@ -158,7 +158,7 @@ class AuthService {
   Future<String?> clockInUser({
     required String uid,
     required String deptCode,
-    //required GeoPoint location,
+    required GeoPoint location,
   }) async {
     try {
       // 1. Create a unique ID for the day (e.g., 2026-02-27_UserID)
@@ -173,7 +173,7 @@ class AuthService {
         'attendanceDate': DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day), // Midnight of today
         'attendanceStartTime': FieldValue.serverTimestamp(),
         'attendanceEndTime': null, // Empty until they clock out
-        //'attendanceLocation': location, // Placeholder for now
+        'attendanceLocation': location, // Placeholder for now
         'attendanceStatus': "Present",
         'attendanceUserID': uid,
         'deptCode': deptCode, // Crucial for Manager filtering
@@ -182,6 +182,31 @@ class AuthService {
       return null; // Success
     } catch (e) {
       return e.toString();
+    }
+  }
+
+  Future<String?> clockOutUser({
+    required String uid,
+  }) async {
+    try {
+      // 1. Recreate the SAME unique ID used in clockIn (yyyy-MM-dd_UserID)
+      String dateId = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      String docId = "${dateId}_$uid";
+
+      // 2. Reference the existing document
+      DocumentReference docRef = _db.collection('attendances').doc(docId);
+
+      // 3. Update the existing document with the end time
+      await docRef.update({
+        'attendanceEndTime': FieldValue.serverTimestamp(),
+        // Optional: change status to 'Completed' if you want to distinguish from just 'Present'
+        // 'attendanceStatus': "Completed", 
+      });
+
+      return null; // Success
+    } catch (e) {
+      // If the user tries to clock out but no clock-in record exists for today
+      return "Clock-out failed: ${e.toString()}";
     }
   }
 }

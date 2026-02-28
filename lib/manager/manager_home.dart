@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:worknest/services/auth_service.dart';
 import 'package:geolocator/geolocator.dart';
+import 'manager_employee.dart';
 
 class ManagerHome extends StatefulWidget {
   const ManagerHome({super.key});
@@ -37,8 +38,10 @@ class _ManagerHomePageState extends State<ManagerHome> {
   // Example: Coordinates for your office
   // TODO: change to manager provided location
   // TODO: let manager provide radius allowed
-  final double officeLat = 37.421983;
-  final double officeLng = -122.084049;
+  final double officeLat = 3.145686;
+  final double officeLng = 101.579963;
+  //final double officeLat = 37.421983;
+  //final double officeLng = -122.084049;
   final double maxDistanceInMeters = 100.0; // The radius allowed (m)
 
   // --- INITIALIZATION ---
@@ -78,7 +81,7 @@ class _ManagerHomePageState extends State<ManagerHome> {
     final List<Widget> pages = [
       _buildHomeDashboard(context),                                // Index 0
       const Center(child: Text("Calendar Coming Soon")),    // Index 1
-      const Center(child: Text("Staff List Coming Soon")),  // Index 2
+      ManagerEmployee(deptCode: deptCode),
       const Center(child: Text("Tasks Page")),              // Index 3
       const Center(child: Text("Profile Page")),            // Index 4
     ];
@@ -120,7 +123,6 @@ class _ManagerHomePageState extends State<ManagerHome> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-
             // --- Top Greeting Row ---
             Row(
               children: [
@@ -274,27 +276,27 @@ class _ManagerHomePageState extends State<ManagerHome> {
             barrierDismissible: false,
             builder: (context) => const Center(child: CircularProgressIndicator()));
 
-        // 1. Get User's Current GPS Position
-        // Position position = await _getCurrentLocation() ?? await Geolocator.getCurrentPosition();
+        //1. Get User's Current GPS Position
+        Position position = await _getCurrentLocation() ?? await Geolocator.getCurrentPosition();
         
-        // 2. Calculate Distance from Office
-        // double distanceInMeters = Geolocator.distanceBetween(
-        //   position.latitude, 
-        //   position.longitude, 
-        //   officeLat, 
-        //   officeLng
-        // );
+        //2. Calculate Distance from Office
+        double distanceInMeters = Geolocator.distanceBetween(
+          position.latitude, 
+          position.longitude, 
+          officeLat, 
+          officeLng
+        );
 
-        // 3. Check if user is within the allowed radius (e.g., 100m)
-        // if (distanceInMeters <= maxDistanceInMeters) {
+        //3. Check if user is within the allowed radius (e.g., 100m)
+        if (distanceInMeters <= maxDistanceInMeters) {
           
           // Success: User is at the office
-          // GeoPoint currentGeoPoint = GeoPoint(position.latitude, position.longitude);
+          GeoPoint currentGeoPoint = GeoPoint(position.latitude, position.longitude);
 
           String? error = await _authService.clockInUser(
             uid: user.uid,
             deptCode: deptCode,
-            // location: currentGeoPoint, // Pass this once you uncomment GPS logic
+            location: currentGeoPoint, // Pass this once you uncomment GPS logic
           );
 
           Navigator.pop(context); // Close loading indicator
@@ -324,12 +326,12 @@ class _ManagerHomePageState extends State<ManagerHome> {
               const SnackBar(content: Text("Clock-in successful! You are on-site."), backgroundColor: Colors.green)
             );
           }
-        // } else {
-        //   Navigator.pop(context);
-        //   ScaffoldMessenger.of(context).showSnackBar(
-        //     SnackBar(content: Text("Too far from office: ${distanceInMeters.toStringAsFixed(0)}m"), backgroundColor: Colors.red)
-        //   );
-        // }
+        } else {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Too far from office: ${distanceInMeters.toStringAsFixed(0)}m"), backgroundColor: Colors.red)
+          );
+        }
       } catch (e) {
         if (Navigator.canPop(context)) Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
@@ -337,21 +339,43 @@ class _ManagerHomePageState extends State<ManagerHome> {
     }
   }
 
-  // This handles the ACTUAL data reset
-  void _clockOutLogic() {
-    _timer?.cancel(); // Stop the timer first
-    _timer = null;
+  void _clockOutLogic() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
 
-    setState(() {
-      _isClockedIn = false;
-      _workingHours = "00:00:00";
-      _endTime = DateTime.now();
-      _startTime = null; 
-    });
+    try {
+      // Show loading while talking to Firebase
+      showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(child: CircularProgressIndicator()));
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Clocked out successfully!"), backgroundColor: Colors.orange),
-    );
+      // Call the new service function
+      String? error = await _authService.clockOutUser(uid: user.uid);
+
+      Navigator.pop(context); // Close loading
+
+      if (error == null) {
+        _timer?.cancel();
+        _timer = null;
+
+        setState(() {
+          _isClockedIn = false;
+          _workingHours = "00:00:00";
+          _startTime = null;
+          _endTime = DateTime.now();
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Clock-out recorded in Firebase!"), backgroundColor: Colors.orange),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+      }
+    } catch (e) {
+      if (Navigator.canPop(context)) Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+    }
   }
 
   // This handles the UI pop-up
