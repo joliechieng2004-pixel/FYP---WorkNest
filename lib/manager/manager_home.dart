@@ -17,7 +17,6 @@ class ManagerHome extends StatefulWidget {
 class _ManagerHomePageState extends State<ManagerHome> {
   bool _isClockedIn = false;
   DateTime? _startTime;
-  DateTime? _endTime;
   String _workingHours = "00:00:00";
   Timer? _timer;
   bool _isLoading = true;
@@ -395,7 +394,6 @@ class _ManagerHomePageState extends State<ManagerHome> {
           _isClockedIn = false;
           _workingHours = "00:00:00";
           _startTime = null;
-          _endTime = DateTime.now();
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
