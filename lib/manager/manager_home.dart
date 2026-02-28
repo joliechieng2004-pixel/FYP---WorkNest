@@ -19,11 +19,11 @@ class _ManagerHomePageState extends State<ManagerHome> {
   DateTime? _startTime;
   DateTime? _endTime;
   String _workingHours = "00:00:00";
-  Timer? _timer; // Import 'dart:async' for this
+  Timer? _timer;
+  bool _isLoading = true;
 
   // for navigation
   int _selectedIndex =0;
-
   final AuthService _authService = AuthService();
   // often use colors
   final Color primaryBlue = const Color.fromARGB(255, 40, 75, 158);
@@ -48,7 +48,15 @@ class _ManagerHomePageState extends State<ManagerHome> {
   @override
   void initState() {
     super.initState();
-    _loadManagerData();
+    _initializeData();
+  }
+
+  void _initializeData() async {
+    await _loadManagerData();
+    await _checkCurrentAttendanceStatus();
+    setState(() {
+      _isLoading = false;
+    });
   }
 
   @override
@@ -59,7 +67,7 @@ class _ManagerHomePageState extends State<ManagerHome> {
   }
 
   // Fetch the current manager's department details
-  void _loadManagerData() async {
+  Future<void> _loadManagerData() async {
     User? user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       DocumentSnapshot userDoc = await FirebaseFirestore.instance
@@ -74,9 +82,46 @@ class _ManagerHomePageState extends State<ManagerHome> {
     }
   }
 
+  Future<void>  _checkCurrentAttendanceStatus() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      // Reconstruct the same doc ID used in your clock-in logic
+      String dateId = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      String docId = "${dateId}_${user.uid}";
+
+      DocumentSnapshot doc = await FirebaseFirestore.instance
+          .collection('attendances')
+          .doc(docId)
+          .get();
+
+      if (doc.exists) {
+        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+        
+        // If there is a start time but NO end time, they are still on shift
+        if (data['attendanceStartTime'] != null && data['attendanceEndTime'] == null) {
+          Timestamp startTimestamp = data['attendanceStartTime'];
+          DateTime startTime = startTimestamp.toDate();
+
+          setState(() {
+            _isClockedIn = true;
+            _startTime = startTime;
+          });
+
+          _startTimerTicker(); // Helper to start the actual timer
+        }
+      }
+    }
+  }
+
   // --- BUILD WIDGETS ---
   @override
   Widget build(BuildContext context) {
+    if (_isLoading){
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator())
+      );
+    }
+    
     // 1. Define the pages
     final List<Widget> pages = [
       _buildHomeDashboard(context),                                // Index 0
@@ -302,25 +347,12 @@ class _ManagerHomePageState extends State<ManagerHome> {
           Navigator.pop(context); // Close loading indicator
 
           if (error == null) {
-            // IMPORTANT: Cancel any existing timer before starting a new one
-            _timer?.cancel();
-
             setState(() {
               _isClockedIn = true;
               _startTime = DateTime.now();
             });
 
-            // Start the live ticker for "Total Working Hours"
-            _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-              if (_isClockedIn && _startTime != null) {
-                final duration = DateTime.now().difference(_startTime!);
-                setState(() {
-                  _workingHours = duration.toString().split('.').first.padLeft(8, "0");
-                });
-              } else {
-                timer.cancel(); // Safety stop
-              }
-            });
+            _startTimerTicker();
 
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text("Clock-in successful! You are on-site."), backgroundColor: Colors.green)
@@ -486,5 +518,19 @@ class _ManagerHomePageState extends State<ManagerHome> {
       ),
       child: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
     );
+  }
+
+  void _startTimerTicker() {
+    _timer?.cancel(); // Clear any existing timer
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_isClockedIn && _startTime != null) {
+        final duration = DateTime.now().difference(_startTime!);
+        setState(() {
+          _workingHours = duration.toString().split('.').first.padLeft(8, "0");
+        });
+      } else {
+        timer.cancel();
+      }
+    });
   }
 }
