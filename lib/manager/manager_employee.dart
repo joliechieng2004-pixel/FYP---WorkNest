@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:worknest/services/auth_service.dart';
 
 class ManagerEmployee extends StatefulWidget {
   final String deptCode;
@@ -63,7 +64,7 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
                         stream: FirebaseFirestore.instance
                             .collection('users')
                             .where('deptCode', isEqualTo: widget.deptCode)
-                            .where('role', isEqualTo: 'Employee') // Only show employees
+                            .where('userRole', isEqualTo: 'employee') // Only show employees
                             .snapshots(),
                         builder: (context, snapshot) {
                           if (snapshot.hasError) {
@@ -277,20 +278,21 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
                 );
 
                 // 2. Call the logic to save to Firebase
-                String? result = await _registerWorkerInFirestore(
-                  fname: fNameController.text.trim(),
-                  lname: lNameController.text.trim(),
+                String? result = await AuthService().createEmployeeByManager(
+                  fName: fNameController.text.trim(),
+                  lName: lNameController.text.trim(),
                   email: emailController.text.trim(),
                   contact: contactController.text.trim(),
                   password: passwordController.text.trim(),
+                  managerDeptCode: widget.deptCode,
                 );
 
-                Navigator.pop(context); // Pop loading
-                Navigator.pop(context); // Pop dialog
+                if (mounted) Navigator.pop(context); // Close loading
 
                 if (result == null) {
+                  if (mounted) Navigator.pop(context); // Close the Add Worker dialog
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text("Worker added successfully!"), backgroundColor: Colors.green),
+                    const SnackBar(content: Text("Worker account created!"), backgroundColor: Colors.green),
                   );
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -324,41 +326,40 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
     );
   }
 
-  Future<String?> _registerWorkerInFirestore({
-    required String fname,
-    required String lname,
-    required String email,
-    required String contact,
-    required String password,
-  }) async {
-    try {
-      // Note: In a production app, you'd use Firebase Auth to create the account.
-      // For now, we create a user document that the worker can 'claim' or log into.
-      
-      await FirebaseFirestore.instance.collection('users').add({
-        'userFName': fname,
-        'userLName': lname,
-        'email': email,
-        'contact': contact,
-        'password': password, // Ideally, don't store plain text passwords in production!
-        'deptCode': widget.deptCode, // Pass from the manager
-        'role': 'Employee',
-        'isActive': true,
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-      // 2. UPDATE THE TOTAL MEMBER COUNT IN FIREBASE
-      // We target the specific department document using the deptCode
-      await FirebaseFirestore.instance
-          .collection('departments')
-          .doc(widget.deptCode) 
-          .update({
-        'totalMembers': FieldValue.increment(1), // Adds 1 to the existing value
-      });
-      return null;
-    } catch (e) {
-      return e.toString();
-    }
-  }
+  // Future<String?> _registerWorkerInFirestore({
+  //   required String fname,
+  //   required String lname,
+  //   required String email,
+  //   required String contact,
+  //   required String password,
+  // }) async {
+  //   try {
+  //     // Note: In a production app, you'd use Firebase Auth to create the account.
+  //     // For now, we create a user document that the worker can 'claim' or log into.
+  //     await FirebaseFirestore.instance.collection('users').add({
+  //       'userFName': fname,
+  //       'userLName': lname,
+  //       'email': email,
+  //       'contact': contact,
+  //       'password': password, // Ideally, don't store plain text passwords in production!
+  //       'deptCode': widget.deptCode, // Pass from the manager
+  //       'role': 'Employee',
+  //       'isActive': true,
+  //       'createdAt': FieldValue.serverTimestamp(),
+  //     });
+  //     // 2. UPDATE THE TOTAL MEMBER COUNT IN FIREBASE
+  //     // We target the specific department document using the deptCode
+  //     await FirebaseFirestore.instance
+  //         .collection('departments')
+  //         .doc(widget.deptCode) 
+  //         .update({
+  //       'totalMembers': FieldValue.increment(1), // Adds 1 to the existing value
+  //     });
+  //     return null;
+  //   } catch (e) {
+  //     return e.toString();
+  //   }
+  // }
 
   Future<void> _removeEmployee(String docId) async {
     try {

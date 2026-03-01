@@ -43,6 +43,8 @@ class _ManagerHomePageState extends State<ManagerHome> {
   //final double officeLng = -122.084049;
   final double maxDistanceInMeters = 100.0; // The radius allowed (m)
 
+  int _totalEmployees = 0;
+
   // --- INITIALIZATION ---
   @override
   void initState() {
@@ -53,6 +55,7 @@ class _ManagerHomePageState extends State<ManagerHome> {
   void _initializeData() async {
     await _loadManagerData();
     await _checkCurrentAttendanceStatus();
+    await _loadEmployeeCount();
     setState(() {
       _isLoading = false;
     });
@@ -148,6 +151,10 @@ class _ManagerHomePageState extends State<ManagerHome> {
           setState(() {
             _selectedIndex = index; // This triggers the UI refresh
           });
+          // If the manager clicks "Home", refresh the count
+          if (index == 0) {
+            _loadEmployeeCount();
+          }
         },
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home_filled), label: "Home"),
@@ -530,5 +537,21 @@ class _ManagerHomePageState extends State<ManagerHome> {
         timer.cancel();
       }
     });
+  }
+
+  Future<void> _loadEmployeeCount() async {
+    if (deptCode == "Loading...") return; // Wait until we have the deptCode
+
+    QuerySnapshot querySnapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .where('deptCode', isEqualTo: deptCode)
+        .where('role', isEqualTo: 'Employee')
+        .get();
+
+    if (mounted) {
+      setState(() {
+        _totalEmployees = querySnapshot.docs.length;
+      });
+    }
   }
 }

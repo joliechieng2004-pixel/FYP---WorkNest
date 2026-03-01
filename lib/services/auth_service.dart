@@ -1,6 +1,7 @@
 // Registration Logic
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'dart:math';
 
 import 'package:intl/intl.dart';
@@ -80,40 +81,91 @@ class AuthService {
     return 'Registration failed';
   }
 
-  // TODO: create employee in employee page
   // 3. CREATE EMPLOYEE (Inside Manager Dashboard)
   Future<String?> createEmployeeByManager({
-    required String email,
-    required String password,
     required String fName,
     required String lName,
+    required String email,
     required String contact,
-    required String managerDeptCode, // Passed from Manager's current data
+    required String password,
+    required String managerDeptCode,
   }) async {
+    // Create a temporary secondary app to avoid logging out the Manager
+    FirebaseApp secondaryApp = await Firebase.initializeApp(
+      name: 'TemporaryUserCreation',
+      options: Firebase.app().options,
+    );
+
     try {
-      // Create the Employee's Auth Account
-      UserCredential result = await _auth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      // 1. Create the Auth Account using the secondary app
+      UserCredential result = await FirebaseAuth.instanceFor(app: secondaryApp)
+          .createUserWithEmailAndPassword(email: email, password: password);
 
       if (result.user != null) {
+        // 2. Create the User Document in Firestore using the NEW UID
         await _db.collection('users').doc(result.user!.uid).set({
           'userFName': fName,
           'userLName': lName,
           'userEmail': email,
           'userContact': contact,
-          'userRole': 'employee', // Hardcoded as Employee
+          'userRole': 'employee', // Matches the login check
           'deptCode': managerDeptCode,
+          'isActive': true,
           'createdAt': FieldValue.serverTimestamp(),
         });
-        return null;
+
+        // 3. Increment the department count
+        await _db.collection('departments').doc(managerDeptCode).update({
+          'totalMembers': FieldValue.increment(1),
+        });
+
+        await secondaryApp.delete(); // Clean up
+        return null; // Success
       }
     } on FirebaseAuthException catch (e) {
+      await secondaryApp.delete();
       return e.message;
+    } catch (e) {
+      await secondaryApp.delete();
+      return e.toString();
     }
     return 'Employee creation failed';
   }
+
+  // TODO: create employee in employee page
+  // // 3. CREATE EMPLOYEE (Inside Manager Dashboard)
+  // Future<String?> createEmployeeByManager({
+  //   required String email,
+  //   required String password,
+  //   required String fName,
+  //   required String lName,
+  //   required String contact,
+  //   required String managerDeptCode, // Passed from Manager's current data
+  // }) async {
+  //   try {
+  //     // Create the Employee's Auth Account
+  //     UserCredential result = await _auth.createUserWithEmailAndPassword(
+  //       email: email,
+  //       password: password,
+  //     );
+
+  //     if (result.user != null) {
+  //       await _db.collection('users').doc(result.user!.uid).set({
+  //         'userFName': fName,
+  //         'userLName': lName,
+  //         'userEmail': email,
+  //         'userContact': contact,
+  //         'userRole': 'employee', // Hardcoded as Employee
+  //         'deptCode': managerDeptCode,
+  //         'createdAt': FieldValue.serverTimestamp(),
+  //       });
+  //       return null;
+  //     }
+  //   } on FirebaseAuthException catch (e) {
+  //     return e.message;
+  //   }
+  //   return 'Employee creation failed';
+  // }
 
   // 4. LOGIN USER WITH DEPT CODE VERIFICATION
   // Change the return type from Map? to String?
