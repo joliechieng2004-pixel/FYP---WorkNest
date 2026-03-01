@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 class ManagerEmployee extends StatefulWidget {
@@ -58,11 +59,30 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
                     
                     // Scrollable List of Workers
                     Expanded(
-                      child: ListView.builder(
-                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-                        itemCount: 6, // Replace with your Firebase data count later
-                        itemBuilder: (context, index) {
-                          return _buildExpandableWorkerRow(index);
+                      child: StreamBuilder<QuerySnapshot>(
+                        stream: FirebaseFirestore.instance
+                            .collection('users')
+                            .where('deptCode', isEqualTo: widget.deptCode)
+                            .where('role', isEqualTo: 'Employee') // Only show employees
+                            .snapshots(),
+                        builder: (context, snapshot) {
+                          if (snapshot.hasError) {
+                            return const Center(child: Text("Something went wrong"));
+                          }
+                          if (snapshot.connectionState == ConnectionState.waiting) {
+                            return const Center(child: CircularProgressIndicator());
+                          }
+                          if (snapshot.data!.docs.isEmpty) {
+                            return const Center(child: Text("No employees found in this department."));
+                          }
+
+                          return ListView.builder(
+                            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                            itemCount: snapshot.data!.docs.length,
+                            itemBuilder: (context, index) {
+                              return _buildExpandableWorkerRow(snapshot.data!.docs[index], index);
+                            },
+                          );
                         },
                       ),
                     ),
@@ -72,11 +92,6 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
             ),
           ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: addWorker,
-        backgroundColor: const Color(0xFF1A3E88),
-        child: const Icon(Icons.add, color: Colors.white),
       ),
     );
   }
@@ -97,20 +112,14 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
   }
 
   // Each individual Worker Row that expands
-  Widget _buildExpandableWorkerRow(int index) {
+  Widget _buildExpandableWorkerRow(DocumentSnapshot doc, int index) {
     bool isExpanded = _expandedIndex == index;
-
-    // Hardcoded data for UI testing - replace with your model later
-    List<Map<String, String>> dummyData = [
-      {"id": "001", "name": "Jane Tan", "att": "90%", "status": "Active"},
-      {"id": "002", "name": "John Lim", "att": "100%", "status": "Active"},
-      {"id": "003", "name": "Charles", "att": "95%", "status": "Inactive"},
-      {"id": "004", "name": "Wong", "att": "98%", "status": "Active"},
-      {"id": "005", "name": "John Lim", "att": "100%", "status": "Active"},
-      {"id": "006", "name": "John Lim", "att": "100%", "status": "Active"},
-    ];
-
-    var worker = dummyData[index];
+    // Extract data from Firestore document
+    Map<String, dynamic> worker = doc.data() as Map<String, dynamic>;
+    String name = worker['userLName'] ?? 'Unknown';
+    String status = (worker['isActive'] ?? true) ? "Active" : "Inactive";
+    // For now, ID can be the last 3 digits of the Doc ID or a specific field
+    String workerId = doc.id.substring(doc.id.length - 3).toUpperCase();
 
     return GestureDetector(
       onTap: () {
@@ -133,14 +142,14 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
             // Basic Info Row
             Row(
               children: [
-                Expanded(flex: 1, child: Center(child: Text(worker['id']!, style: const TextStyle(fontWeight: FontWeight.bold)))),
-                Expanded(flex: 3, child: Center(child: Text(worker['name']!))),
-                Expanded(flex: 2, child: Center(child: Text(worker['att']!))),
+                Expanded(flex: 1, child: Center(child: Text(workerId, style: const TextStyle(fontWeight: FontWeight.bold)))),
+                Expanded(flex: 3, child: Center(child: Text(name))),
+                const Expanded(flex: 2, child: Center(child: Text("90%"))), // Attendance logic later
                 Expanded(
                   flex: 2, 
                   child: Center(
-                    child: Text(worker['status']!, 
-                      style: TextStyle(color: worker['status'] == "Active" ? Colors.green : Colors.red, fontWeight: FontWeight.bold)
+                    child: Text(status, 
+                      style: TextStyle(color: status == "Active" ? Colors.green : Colors.red, fontWeight: FontWeight.bold)
                     )
                   )
                 ),
@@ -154,11 +163,10 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   _actionButton("View Profile", Colors.white, () {
-                    print("Viewing profile of ${worker['name']}");
+                    print("Viewing profile of $name");
                   }),
                   _actionButton("Remove Worker", Colors.white, () {
-                    print("Removing ${worker['name']}");
-                  }, isDelete: true),
+                    _showRemoveConfirmation(doc.id, name);}, isDelete: true),
                 ],
               ),
             ]
@@ -199,7 +207,192 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
     );
   }
 
+  void _showRemoveConfirmation(String docId, String name) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Confirm Clock Out", style: TextStyle(fontWeight:FontWeight(5)),),
+          content: const Text("Are you sure you want to end your shift?"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel", style: TextStyle(color: Colors.black),),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context); // Close dialog
+                _removeEmployee(docId);       // Run the reset logic
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black),
+              child: const Text("Confirm"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   void addWorker() {
-    print("Add worker dialog triggered");
+    final fNameController = TextEditingController();
+    final lNameController = TextEditingController();
+    final emailController = TextEditingController();
+    final contactController = TextEditingController();
+    final passwordController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Register New Worker", 
+          style: TextStyle(color: Color(0xFF1A3E88), fontWeight: FontWeight.bold)),
+        content: SingleChildScrollView(
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildPopupField(fNameController, "First Name", Icons.person),
+                _buildPopupField(lNameController, "Last Name", Icons.person),
+                _buildPopupField(emailController, "Email Address", Icons.email),
+                _buildPopupField(contactController, "Contact Number", Icons.phone),
+                _buildPopupField(passwordController, "Temporary Password", Icons.lock, isPassword: true),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (formKey.currentState!.validate()) {
+                // 1. Show loading
+                showDialog(
+                  context: context, 
+                  barrierDismissible: false, 
+                  builder: (context) => const Center(child: CircularProgressIndicator())
+                );
+
+                // 2. Call the logic to save to Firebase
+                String? result = await _registerWorkerInFirestore(
+                  fname: fNameController.text.trim(),
+                  lname: lNameController.text.trim(),
+                  email: emailController.text.trim(),
+                  contact: contactController.text.trim(),
+                  password: passwordController.text.trim(),
+                );
+
+                Navigator.pop(context); // Pop loading
+                Navigator.pop(context); // Pop dialog
+
+                if (result == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("Worker added successfully!"), backgroundColor: Colors.green),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text("Error: $result"), backgroundColor: Colors.red),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1A3E88)),
+            child: const Text("Register", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Helper to build the text fields inside the popup
+  Widget _buildPopupField(TextEditingController controller, String label, IconData icon, {bool isPassword = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: TextFormField(
+        controller: controller,
+        obscureText: isPassword,
+        decoration: InputDecoration(
+          labelText: label,
+          prefixIcon: Icon(icon, color: const Color(0xFF1A3E88)),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+        validator: (val) => val!.isEmpty ? "Required field" : null,
+      ),
+    );
+  }
+
+  Future<String?> _registerWorkerInFirestore({
+    required String fname,
+    required String lname,
+    required String email,
+    required String contact,
+    required String password,
+  }) async {
+    try {
+      // Note: In a production app, you'd use Firebase Auth to create the account.
+      // For now, we create a user document that the worker can 'claim' or log into.
+      
+      await FirebaseFirestore.instance.collection('users').add({
+        'userFName': fname,
+        'userLName': lname,
+        'email': email,
+        'contact': contact,
+        'password': password, // Ideally, don't store plain text passwords in production!
+        'deptCode': widget.deptCode, // Pass from the manager
+        'role': 'Employee',
+        'isActive': true,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      // 2. UPDATE THE TOTAL MEMBER COUNT IN FIREBASE
+      // We target the specific department document using the deptCode
+      await FirebaseFirestore.instance
+          .collection('departments')
+          .doc(widget.deptCode) 
+          .update({
+        'totalMembers': FieldValue.increment(1), // Adds 1 to the existing value
+      });
+      return null;
+    } catch (e) {
+      return e.toString();
+    }
+  }
+
+  Future<void> _removeEmployee(String docId) async {
+    try {
+      // 1. Show a loading spinner so the manager knows it's processing
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator()),
+      );
+
+      // 2. Perform the deletions and updates
+      // It's good practice to do these together
+      await FirebaseFirestore.instance.collection('users').doc(docId).delete();
+      await FirebaseFirestore.instance
+          .collection('departments')
+          .doc(widget.deptCode)
+          .update({
+        'totalMembers': FieldValue.increment(-1),
+      });
+
+      // 3. Close the loading spinner
+      if (mounted) Navigator.pop(context);
+
+      // 4. Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Employee removed successfully"), backgroundColor: Colors.red),
+      );
+    } catch (e) {
+      // Close loading spinner if error occurs
+      if (mounted) Navigator.pop(context);
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error removing employee: $e")),
+      );
+    }
   }
 }
