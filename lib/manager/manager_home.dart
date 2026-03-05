@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:worknest/manager/manager_schedule.dart';
 import 'package:worknest/services/auth_service.dart';
 import 'package:geolocator/geolocator.dart';
 import 'manager_employee.dart';
@@ -22,7 +23,7 @@ class _ManagerHomePageState extends State<ManagerHome> {
   bool _isLoading = true;
 
   // for navigation
-  int _selectedIndex =0;
+  int _selectedIndex = 0;
   final AuthService _authService = AuthService();
   // often use colors
   final Color primaryBlue = const Color.fromARGB(255, 40, 75, 158);
@@ -126,9 +127,9 @@ class _ManagerHomePageState extends State<ManagerHome> {
     
     // 1. Define the pages
     final List<Widget> pages = [
-      _buildHomeDashboard(context),                                // Index 0
-      const Center(child: Text("Calendar Coming Soon")),    // Index 1
-      ManagerEmployee(deptCode: deptCode),
+      _buildHomeDashboard(context),                         // Index 0 - Home Page
+      ManagerSchedule(deptCode: deptCode),                  // Index 1 - Schedule Page
+      ManagerEmployee(deptCode: deptCode),                  // Index 2 - Employee Page
       const Center(child: Text("Tasks Page")),              // Index 3
       const Center(child: Text("Profile Page")),            // Index 4
     ];
@@ -148,6 +149,7 @@ class _ManagerHomePageState extends State<ManagerHome> {
         showSelectedLabels: false,
         showUnselectedLabels: false,
         onTap: (index) {
+          print("Swithcing to index: $index");
           setState(() {
             _selectedIndex = index; // This triggers the UI refresh
           });

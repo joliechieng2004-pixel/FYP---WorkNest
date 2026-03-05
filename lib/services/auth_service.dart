@@ -36,22 +36,10 @@ class AuthService {
       
       // If user not existed
       if (result.user != null) {
-        // A. GET AND INCREMENT THE TOTAL USER COUNT
-        DocumentReference counterRef = _db.collection('metadata').doc('users_stats');
-        
-        // This runs a "Transaction" to make sure two users don't get the same number
-        int newStaffNumber = await _db.runTransaction((transaction) async {
-          DocumentSnapshot snapshot = await transaction.get(counterRef);
-          int newCount = (snapshot.get('count') as int) + 1;
-          transaction.update(counterRef, {'count': newCount});
-          return newCount;
-        });
-
         String newCode = generateDeptCode();
 
         // Create Manager Profile
         await _db.collection('users').doc(result.user!.uid).set({
-          'staffID': newStaffNumber.toString().padLeft(4, '0'), // Becomes "0001"
           'userFName': fName,
           'userLName': lName,
           'userContact': contact,
