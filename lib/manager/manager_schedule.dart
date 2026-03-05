@@ -1,7 +1,9 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:worknest/services/auth_service.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'package:worknest/widget/leaveitem.dart';
 
 class ManagerSchedule extends StatefulWidget {
   final String deptCode;
@@ -13,19 +15,26 @@ class ManagerSchedule extends StatefulWidget {
 }
 
 class _ManagerSchedulePageState extends State<ManagerSchedule> {
-  CalendarFormat _calendarFormat = CalendarFormat.month;
-  DateTime _focusedDay = DateTime.now();
-  DateTime? _selectedDay;
-
-
-  final AuthService _authService = AuthService();
   // often use colors
   final Color primaryBlue = const Color.fromARGB(255, 40, 75, 158);
   final Color bgLightBlue = const Color.fromARGB(255, 240, 250, 255);
+  
+  // Calendar
+  CalendarFormat _calendarFormat = CalendarFormat.month;
+  DateTime _focusedDay = DateTime.now();
+  DateTime? _selectedDay;
+  bool _isDateSelected = false;
+  
+  // Shift
+  TimeOfDay _startTime = const TimeOfDay(hour: 9, minute: 0);
+  TimeOfDay _endTime = const TimeOfDay(hour: 17, minute: 0);
+  final TextEditingController _taskController = TextEditingController();
 
-  final ScrollController _activityScrollController = ScrollController();
+  final AuthService _authService = AuthService();
+
+  final ScrollController _leaveScrollController = ScrollController();
   String deptCode = "Loading...";
-  String lName = "Name";
+  String fName = "Name";
   String formattedDate = DateFormat('EEEE, d MMM yyyy').format(DateTime.now());
   String formattedTime = DateFormat('h:mm a').format(DateTime.now());
 
@@ -38,7 +47,7 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
 
   @override
   void dispose() {
-    _activityScrollController.dispose(); // Clean up the controller
+    _leaveScrollController.dispose(); // Clean up the controller
     super.dispose(); 
   }
 
@@ -65,10 +74,17 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
                 elevation: 4,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                 child: TableCalendar(
-                  firstDay: DateTime.utc(2025, 1, 1),
+                  firstDay: DateTime.now().subtract(const Duration(days: 0)),
                   lastDay: DateTime.utc(2030, 12, 31),
                   focusedDay: _focusedDay,
                   calendarFormat: _calendarFormat,
+                  enabledDayPredicate: (day) {
+                    // Only allow dates that are today or in the future
+                    // We compare against a "cleaned" version of today (midnight)
+                    final now = DateTime.now();
+                    final today = DateTime(now.year, now.month, now.day);
+                    return day.isAfter(today.subtract(const Duration(days: 1)));
+                  },
                   selectedDayPredicate: (day) {
                     // Tells the calendar which day to highlight as "selected"
                     return isSameDay(_selectedDay, day);
@@ -77,6 +93,7 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
                     setState(() {
                       _selectedDay = selectedDay;
                       _focusedDay = focusedDay; // update focusedDay as well
+                      _isDateSelected = true;
                     });
                     
                     // TODO: Fetch shifts from Firestore for this specific date!
@@ -101,29 +118,76 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
               ),
 
               // 2. Worker List
-              _buildCard(
-                color: bgLightBlue,
-                child: Row(
-                  children: [
-                    Expanded(
-                      flex: 5,
-                      child: const Text(
-                        "Worker List",
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold))),
-                    Expanded(
-                      flex: 5,
-                      child: SelectableText(
-                        deptCode, 
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: primaryBlue,
-                          letterSpacing: 5),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              _isDateSelected 
+                ? StreamBuilder<QuerySnapshot>(
+                    // Stream 1: Listen to all shifts for this day and department
+                    stream: FirebaseFirestore.instance
+                        .collection('shifts')
+                        .where('deptCode', isEqualTo: widget.deptCode)
+                        .where('shiftDate', isEqualTo: Timestamp.fromDate(_selectedDay!))
+                        .snapshots(),
+                    builder: (context, shiftSnapshot) {
+                      return StreamBuilder<QuerySnapshot>(
+                        // Stream 2: Listen to all employees in this department
+                        stream: FirebaseFirestore.instance
+                            .collection('users')
+                            .where('deptCode', isEqualTo: widget.deptCode)
+                            .where('userRole', isEqualTo: 'employee')
+                            .snapshots(),
+                        builder: (context, userSnapshot) {
+                          if (userSnapshot.connectionState == ConnectionState.waiting) {
+                            return const Center(child: CircularProgressIndicator());
+                          }
+
+                          if (!userSnapshot.hasData || userSnapshot.data!.docs.isEmpty) {
+                            return const Center(child: Text("No workers found in this department."));
+                          }
+
+                          var workers = userSnapshot.data!.docs;
+                          var activeShifts = shiftSnapshot.data?.docs ?? [];
+
+                          // MAP: Key is the Worker Document ID, Value is the Status
+                          Map<String, String> workerStatusMap = {};
+                          for (var doc in activeShifts) {
+                            var data = doc.data() as Map<String, dynamic>;
+                            // Using shiftUserID to match against worker.id
+                            workerStatusMap[data['shiftUserID']] = data['shiftStatus'] ?? 'pending';
+                          }
+
+                          return _buildCard(
+                            color: Colors.white,
+                            child: Column(
+                              children: [
+                                const Text("Worker List", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                const Divider(color: Color(0xFF1A3E88)),
+                                ListView.builder(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  itemCount: workers.length,
+                                  itemBuilder: (context, index) {
+                                    var workerData = workers[index].data() as Map<String, dynamic>;
+                                    String name = "${workerData['userFName']} ${workerData['userLName']}";
+                                    
+                                    // THIS IS THE DOCUMENT ID (UserID)
+                                    String workerID = workers[index].id; 
+                                    
+                                    // Lookup status from our map
+                                    String status = workerStatusMap[workerID] ?? "none";
+
+                                    return _buildWorkerRow(name, status, workerID);
+                                  },
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  )
+                : _buildCard(
+                    color: bgLightBlue,
+                    child: const Center(child: Text("Select a date to view shift status")),
+                  ),
 
               // 3. Leave Requests (Scrollable Version)
               // TODO: link employee's activity within the activity card
@@ -133,26 +197,31 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
                   children: [
                     const Center(
                       child: Text(
-                        "Leave Requests", 
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
-                      ),
+                          "Leave Requests",
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
                     ),
+                    const Divider(color: Color(0xFF1A3E88)),
                     const SizedBox(height: 10),
                     
                     // Fixed height container to enable internal scrolling
                     SizedBox(
-                      height: 150, // Set the height you want for the scrollable area
+                      height: 300, // Set the height you want for the scrollable area
                       child: Scrollbar(
-                        controller: _activityScrollController,
+                        controller: _leaveScrollController,
                         thumbVisibility: true, // Makes the scrollbar visible like in your design
-                        child: ListView.builder(
-                          controller: _activityScrollController,
-                          padding: const EdgeInsets.only(right: 10), // Space for the scrollbar
-                          itemCount: 10, // Replace with your actual list length later
-                          itemBuilder: (context, index) {
-                            return _buildActivityItem("Activity ${index + 1}");
-                          },
-                        ),
+                        child: // Inside your Leave Requests _buildCard
+                          ListView.builder(
+                            controller: _leaveScrollController,
+                            padding: const EdgeInsets.only(right: 10),
+                            itemCount: 5, // Example count
+                            itemBuilder: (context, index) {
+                              return const ExpandableLeaveItem(
+                                title: "Employee Name Here",
+                                reason: "Family emergency, need to travel back to KL.",
+                              );
+                            },
+                          ),
                       ),
                     ),
                   ],
@@ -163,6 +232,11 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
               _buildCard(
                 child: Column(
                   children: [
+                    const Text(
+                          "Shift Summary",
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                    const Divider(color: Color(0xFF1A3E88)),
                     _buildStatRow("Pending Leave", "20"),
                     _buildStatRow("Pending Shift", "20"),
                     _buildStatRow("Accepted Shift", "10"),
@@ -222,16 +296,216 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
     );
   }
 
-  // Helper for Activity Items
-  Widget _buildActivityItem(String title) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade300),
-        borderRadius: BorderRadius.circular(10),
+  // Helper for Worker Rows
+  Widget _buildWorkerRow(String name, String status, String workerID) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(name, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w500)),
+          // Pass the name into the status action
+          _buildStatusAction(status, name, workerID), 
+        ],
       ),
-      child: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
     );
+  }
+
+  Widget _buildStatusAction(String status, String workerName, String workerID) {
+    switch (status) {
+      case 'none':
+        return SizedBox(
+          height: 30,
+          width: 100,
+          child: ElevatedButton(
+            onPressed: () => _assignShiftAction(workerID, workerName),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.black,
+              textStyle: const TextStyle(fontSize: 12),
+            ),
+            child: const Text("Assign"),
+          ),
+        );
+      case 'pending':
+        return SizedBox(
+          height: 30,
+          width: 100,
+          child: ElevatedButton(
+            onPressed: () => _removeShiftConfirmation(workerID),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.blueGrey,
+              foregroundColor: Colors.white,
+              textStyle: const TextStyle(fontSize: 12),
+            ),
+            child: const Text("Pending"),
+          ),
+        );
+      case 'accepted':
+        return SizedBox(
+          height: 30,
+          width: 100,
+          child: ElevatedButton(
+            onPressed: () => _removeShiftConfirmation(workerID),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color.fromARGB(255, 16, 117, 54),
+              foregroundColor: Colors.white,
+              textStyle: const TextStyle(fontSize: 12),
+            ),
+            child: const Text("Accepted"),
+          ),
+        );
+      case 'rejected':
+        return SizedBox(
+          height: 30,
+          width: 100,
+          child: ElevatedButton(
+            onPressed: () => _removeShiftConfirmation(workerID),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color.fromARGB(255, 210, 22, 22),
+              foregroundColor: Colors.white,
+              textStyle: const TextStyle(fontSize: 12),
+            ),
+            child: const Text("Rejected"),
+          ),
+        );
+      case 'on leave':
+        return SizedBox(
+          height: 30,
+          width: 100,
+          child: const Text("Unavailable"),
+        );
+      default:
+        return const SizedBox();
+    }
+  }
+
+  void _assignShiftAction(String workerID, String workerName) {
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder( // Use StatefulBuilder to update time inside dialog
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text("Assign Shift to $workerName", 
+            style: TextStyle(color: primaryBlue, fontSize: 18, fontWeight: FontWeight.bold)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text("Date: ${DateFormat('dd MMM yyyy').format(_selectedDay!)}"),
+                const SizedBox(height: 20),
+                
+                // Start Time Picker
+                ListTile(
+                  title: const Text("Start Time"),
+                  trailing: Text(_startTime.format(context)),
+                  onTap: () async {
+                    TimeOfDay? picked = await showTimePicker(context: context, initialTime: _startTime);
+                    if (picked != null) setDialogState(() => _startTime = picked);
+                  },
+                ),
+
+                // End Time Picker
+                ListTile(
+                  title: const Text("End Time"),
+                  trailing: Text(_endTime.format(context)),
+                  onTap: () async {
+                    TimeOfDay? picked = await showTimePicker(context: context, initialTime: _endTime);
+                    if (picked != null) setDialogState(() => _endTime = picked);
+                  },
+                ),
+
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _taskController,
+                  decoration: InputDecoration(
+                    labelText: "Task Description",
+                    hintText: "e.g. Morning Reception, Inventory",
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+            ElevatedButton(
+              onPressed: () async {
+              // --- FIXED CALL HERE ---
+              // Mapping your local variables to the function parameters
+              await _submitShiftToFirestore(
+                workerID: workerID, 
+                taskName: _taskController.text
+              );
+              
+              if (mounted) Navigator.pop(context);
+              _taskController.clear();
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: primaryBlue, foregroundColor: Colors.white),
+            child: const Text("Confirm"),
+          ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _removeShiftConfirmation(String workerID){
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Confirm Remove Shift", style: TextStyle(fontWeight:FontWeight(5)),),
+          content: const Text("Are you sure you want to remove the shift?"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel", style: TextStyle(color: Colors.black),),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context); // Close dialog
+                _removeShiftAction(workerID);       // Run the reset logic
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black),
+              child: const Text("Confirm"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _removeShiftAction(String workerID) async {
+    // Find the shift for this user on this day and delete it
+    var snapshot = await FirebaseFirestore.instance
+        .collection('shifts')
+        .where('shiftUserID', isEqualTo: workerID)
+        .where('shiftDate', isEqualTo: Timestamp.fromDate(_selectedDay!))
+        .get();
+
+    for (var doc in snapshot.docs) {
+      await doc.reference.delete();
+    }
+  }
+
+  Future<void> _submitShiftToFirestore({
+    required String workerID,
+    required String taskName,
+  }) async {
+    // Convert TimeOfDay to String for easy storage
+    String startStr = _startTime.format(context); 
+    String endStr = _endTime.format(context);
+
+    await FirebaseFirestore.instance.collection('shifts').add({
+      'shiftDate': Timestamp.fromDate(_selectedDay!), 
+      'shiftStartTime': startStr,
+      'shiftEndTime': endStr,
+      'shiftStatus': 'pending',
+      'shiftUserID': workerID,
+      'shiftTask': taskName,
+      'deptCode': widget.deptCode, // Using widget.deptCode from the constructor
+      'createdAt': FieldValue.serverTimestamp(),
+    });
   }
 }
