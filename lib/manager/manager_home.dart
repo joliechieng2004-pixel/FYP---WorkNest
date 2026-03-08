@@ -44,6 +44,7 @@ class _ManagerHomePageState extends State<ManagerHome> {
   //final double officeLng = -122.084049;
   final double maxDistanceInMeters = 100.0; // The radius allowed (m)
 
+  // ignore: unused_field
   int _totalEmployees = 0;
 
   // --- INITIALIZATION ---

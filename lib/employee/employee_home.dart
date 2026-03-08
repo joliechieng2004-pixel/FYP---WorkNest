@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:worknest/employee/employee_schedule.dart';
 import 'package:worknest/services/auth_service.dart';
 import 'package:geolocator/geolocator.dart';
 
@@ -14,6 +15,10 @@ class EmployeeHome extends StatefulWidget {
 }
 
 class _EmployeeHomePageState extends State<EmployeeHome> {
+  // often use colors
+  final Color primaryBlue = const Color.fromARGB(255, 40, 75, 158);
+  final Color bgLightBlue = const Color.fromARGB(255, 240, 250, 255);
+
   bool _isClockedIn = false;
   DateTime? _startTime;
   String _workingHours = "00:00:00";
@@ -21,15 +26,15 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
   bool _isLoading = true;
 
   // for navigation
-  int _selectedIndex =0;
+  int _selectedIndex = 0;
+
   final AuthService _authService = AuthService();
-  // often use colors
-  final Color primaryBlue = const Color.fromARGB(255, 40, 75, 158);
-  final Color bgLightBlue = const Color.fromARGB(255, 240, 250, 255);
 
   final ScrollController _activityScrollController = ScrollController();
+
   String deptCode = "Loading...";
   String lName = "Name";
+  String workerID = "Worker ID";
   String formattedDate = DateFormat('EEEE, d MMM yyyy').format(DateTime.now());
   String formattedTime = DateFormat('h:mm a').format(DateTime.now());
   
@@ -42,8 +47,6 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
   //final double officeLng = -122.084049;
   final double maxDistanceInMeters = 100.0; // The radius allowed (m)
 
-  int _totalEmployees = 0;
-
   // --- INITIALIZATION ---
   @override
   void initState() {
@@ -52,9 +55,8 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
   }
 
   void _initializeData() async {
-    await _loadManagerData();
+    await _loadEmployeeData();
     await _checkCurrentAttendanceStatus();
-    await _loadEmployeeCount();
     setState(() {
       _isLoading = false;
     });
@@ -68,7 +70,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
   }
 
   // Fetch the current manager's department details
-  Future<void> _loadManagerData() async {
+  Future<void> _loadEmployeeData() async {
     User? user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       DocumentSnapshot userDoc = await FirebaseFirestore.instance
@@ -77,6 +79,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
           .get();
           
       setState(() {
+        workerID = userDoc.id;
         deptCode = userDoc['deptCode'];
         lName = userDoc['userLName'];
       });
@@ -125,8 +128,8 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
     
     // 1. Define the pages
     final List<Widget> pages = [
-      _buildHomeDashboard(context),                                // Index 0
-      const Center(child: Text("Calendar Coming Soon")),    // Index 1
+      _buildHomeDashboard(context),                         // Index 0 - Home Page
+      EmployeeSchedule(deptCode: deptCode, workerID: workerID),                  // Index 1 - Schedule Page
       const Center(child: Text("Tasks Page")),              // Index 2
       const Center(child: Text("Profile Page")),            // Index 3
     ];
@@ -134,7 +137,10 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
     return Scaffold(
       backgroundColor: bgLightBlue,
       // 2. Switches body based on the index
-      body: pages[_selectedIndex],
+      body: IndexedStack(
+        index: _selectedIndex,
+        children: pages,
+      ),
 
       // 3. Fixed Bottom Navigation Bar
       bottomNavigationBar: BottomNavigationBar(
@@ -146,13 +152,10 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
         showSelectedLabels: false,
         showUnselectedLabels: false,
         onTap: (index) {
+          print("Swithcing to index: $index");
           setState(() {
             _selectedIndex = index; // This triggers the UI refresh
           });
-          // If the manager clicks "Home", refresh the count
-          if (index == 0) {
-            _loadEmployeeCount();
-          }
         },
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home_filled), label: "Home"),
@@ -177,7 +180,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
                 Expanded(
                   flex: 9,
                   child: Text(
-                    "Hi, Employee $lName", 
+                    "Hi, Worker $lName", 
                     textAlign: TextAlign.center,
                     style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
                 ),
@@ -195,22 +198,22 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
 
             const SizedBox(height: 10),
         
-            // 1. Dept Code Card
+            // 1. Worker ID Card
             _buildCard(
               color: Colors.blue.shade50,
               child: Row(
                 children: [
                   Expanded(
-                    flex: 5,
+                    flex: 2,
                     child: const Text(
-                      "Department Code:",
+                      "Worker ID:",
                       style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold))),
                   Expanded(
-                    flex: 5,
+                    flex: 8,
                     child: SelectableText(
-                      deptCode, 
+                      workerID, 
                       style: TextStyle(
-                        fontSize: 20,
+                        fontSize: 10,
                         fontWeight: FontWeight.bold,
                         color: primaryBlue,
                         letterSpacing: 5),
@@ -263,51 +266,57 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
               ),
             ),
 
-            // 3. Summary Card
-            _buildCard(
-              child: Column(
-                children: [
-                  _buildStatRow("Today's Employee", "20"),
-                  _buildStatRow("Attendance Rate", "90%"),
-                  _buildStatRow("Pending Approval", "10"),
-                ],
-              ),
-            ),
-
-            // 4. Activities Card (Scrollable Version)
-            // TODO: link employee's activity within the activity card
+            // 3. Shift Summary (Updated to Weekly Slider Form)
             _buildCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Center(
-                    child: Text(
-                      "Activities", 
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text("Weekly Schedule", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      Row(
+                        children: [
+                          Icon(Icons.chevron_left, color: primaryBlue),
+                          Icon(Icons.chevron_right, color: primaryBlue),
+                        ],
+                      )
+                    ],
                   ),
+                  const Divider(),
                   const SizedBox(height: 10),
                   
-                  // Fixed height container to enable internal scrolling
+                  // Horizontal Scrollable Shift Cards
                   SizedBox(
-                    height: 150, // Set the height you want for the scrollable area
-                    child: Scrollbar(
-                      controller: _activityScrollController,
-                      thumbVisibility: true, // Makes the scrollbar visible like in your design
-                      child: ListView.builder(
-                        controller: _activityScrollController,
-                        padding: const EdgeInsets.only(right: 10), // Space for the scrollbar
-                        itemCount: 10, // Replace with your actual list length later
-                        itemBuilder: (context, index) {
-                          return _buildActivityItem("Activity ${index + 1}");
-                        },
-                      ),
+                    height: 120, 
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      children: [
+                        _buildShiftScheduleCard("13 Sept 2025, Sat", "8:00 am - 5:00 pm", "Workplace"),
+                        _buildShiftScheduleCard("15 Sept 2025, Mon", "9:00 am - 6:00 pm", "Workplace"),
+                        _buildShiftScheduleCard("20 Sept 2025, Sat", "8:00 am - 5:00 pm", "Workplace"),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
-          ],
+
+            // 4. NEW: Upcoming Shift Preview
+            _buildCard(
+              child: Column(
+                children: [
+                  const Text("Next Shift", style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 10),
+                  const ListTile(
+                    leading: Icon(Icons.event, color: Colors.blue),
+                    title: Text("Monday, 9 March"),
+                    subtitle: Text("09:00 AM - 05:00 PM"),
+                  ),
+                ],
+              ),
+            ),
+          ]
         ),
       ),
     );
@@ -374,6 +383,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
     }
   }
 
+  // --- Clock Out ---
   void _clockOutLogic() async {
     User? user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -487,41 +497,6 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
     );
   }
 
-  // Helper for Summary Rows
-  Widget _buildStatRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          Container(
-            width: 60,
-            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
-            decoration: BoxDecoration(
-              border: Border.all(color: primaryBlue),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(value, textAlign: TextAlign.center, style: TextStyle(color: Colors.blueGrey, fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Helper for Activity Items
-  Widget _buildActivityItem(String title) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade300),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
-    );
-  }
-
   void _startTimerTicker() {
     _timer?.cancel(); // Clear any existing timer
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -536,19 +511,27 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
     });
   }
 
-  Future<void> _loadEmployeeCount() async {
-    if (deptCode == "Loading...") return; // Wait until we have the deptCode
-
-    QuerySnapshot querySnapshot = await FirebaseFirestore.instance
-        .collection('users')
-        .where('deptCode', isEqualTo: deptCode)
-        .where('role', isEqualTo: 'Employee')
-        .get();
-
-    if (mounted) {
-      setState(() {
-        _totalEmployees = querySnapshot.docs.length;
-      });
-    }
+  Widget _buildShiftScheduleCard(String date, String time, String location) {
+    return Container(
+      width: 250, // Fixed width for horizontal scrolling
+      margin: const EdgeInsets.only(right: 15),
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(date, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          const SizedBox(height: 5),
+          Text(time, style: const TextStyle(color: Colors.black87)),
+          const SizedBox(height: 5),
+          Text("Location: $location", style: const TextStyle(color: Colors.black87)),
+        ],
+      ),
+    );
   }
 }

@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:worknest/services/auth_service.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:worknest/widget/leaveitem.dart';
@@ -30,11 +29,8 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
   TimeOfDay _endTime = const TimeOfDay(hour: 17, minute: 0);
   final TextEditingController _taskController = TextEditingController();
 
-  final AuthService _authService = AuthService();
-
   final ScrollController _leaveScrollController = ScrollController();
   String deptCode = "Loading...";
-  String fName = "Name";
   String formattedDate = DateFormat('EEEE, d MMM yyyy').format(DateTime.now());
   String formattedTime = DateFormat('h:mm a').format(DateTime.now());
 
@@ -42,7 +38,7 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
   @override
   void initState() {
     super.initState();
-    _selectedDay = _focusedDay; // Default selection to today
+    _selectedDay = DateTime.now(); // Default selection to today
   }
 
   @override
@@ -72,7 +68,7 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
               Card(
                 margin: const EdgeInsets.all(10),
                 elevation: 4,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 child: TableCalendar(
                   firstDay: DateTime.now().subtract(const Duration(days: 0)),
                   lastDay: DateTime.utc(2030, 12, 31),
@@ -80,7 +76,6 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
                   calendarFormat: _calendarFormat,
                   enabledDayPredicate: (day) {
                     // Only allow dates that are today or in the future
-                    // We compare against a "cleaned" version of today (midnight)
                     final now = DateTime.now();
                     final today = DateTime(now.year, now.month, now.day);
                     return day.isAfter(today.subtract(const Duration(days: 1)));
@@ -95,7 +90,6 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
                       _focusedDay = focusedDay; // update focusedDay as well
                       _isDateSelected = true;
                     });
-                    
                     // TODO: Fetch shifts from Firestore for this specific date!
                     print("Selected Date: $_selectedDay");
                   },
@@ -118,79 +112,79 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
               ),
 
               // 2. Worker List
-              _isDateSelected 
-                ? StreamBuilder<QuerySnapshot>(
-                    // Stream 1: Listen to all shifts for this day and department
-                    stream: FirebaseFirestore.instance
-                        .collection('shifts')
-                        .where('deptCode', isEqualTo: widget.deptCode)
-                        .where('shiftDate', isEqualTo: Timestamp.fromDate(_selectedDay!))
-                        .snapshots(),
-                    builder: (context, shiftSnapshot) {
-                      return StreamBuilder<QuerySnapshot>(
-                        // Stream 2: Listen to all employees in this department
-                        stream: FirebaseFirestore.instance
-                            .collection('users')
-                            .where('deptCode', isEqualTo: widget.deptCode)
-                            .where('userRole', isEqualTo: 'employee')
-                            .snapshots(),
-                        builder: (context, userSnapshot) {
-                          if (userSnapshot.connectionState == ConnectionState.waiting) {
-                            return const Center(child: CircularProgressIndicator());
-                          }
+              _isDateSelected
+                  ? _buildCard( // Moved OUTSIDE the builders
+                      color: Colors.white,
+                      child: Column(
+                        children: [
+                          const Text("Worker List", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          const Divider(color: Color(0xFF1A3E88)),
+                          
+                          // Now only the list contents respond to the Stream
+                          StreamBuilder<QuerySnapshot>(
+                            stream: FirebaseFirestore.instance
+                                .collection('shifts')
+                                .where('deptCode', isEqualTo: widget.deptCode)
+                                .where('shiftDate', isEqualTo: Timestamp.fromDate(_selectedDay!))
+                                .snapshots(),
+                            builder: (context, shiftSnapshot) {
+                              return StreamBuilder<QuerySnapshot>(
+                                stream: FirebaseFirestore.instance
+                                    .collection('users')
+                                    .where('deptCode', isEqualTo: widget.deptCode)
+                                    .where('userRole', isEqualTo: 'employee')
+                                    .snapshots(),
+                                builder: (context, userSnapshot) {
+                                  // This loading indicator is now inside the card!
+                                  if (userSnapshot.connectionState == ConnectionState.waiting) {
+                                    return const Padding(
+                                      padding: EdgeInsets.all(20.0),
+                                      child: Center(child: CircularProgressIndicator()),
+                                    );
+                                  }
 
-                          if (!userSnapshot.hasData || userSnapshot.data!.docs.isEmpty) {
-                            return const Center(child: Text("No workers found in this department."));
-                          }
+                                  if (!userSnapshot.hasData || userSnapshot.data!.docs.isEmpty) {
+                                    return const Padding(
+                                      padding: EdgeInsets.all(20.0),
+                                      child: Text("No workers found in this department."),
+                                    );
+                                  }
 
-                          var workers = userSnapshot.data!.docs;
-                          var activeShifts = shiftSnapshot.data?.docs ?? [];
+                                  var workers = userSnapshot.data!.docs;
+                                  var activeShifts = shiftSnapshot.data?.docs ?? [];
 
-                          // MAP: Key is the Worker Document ID, Value is the Status
-                          Map<String, String> workerStatusMap = {};
-                          for (var doc in activeShifts) {
-                            var data = doc.data() as Map<String, dynamic>;
-                            // Using shiftUserID to match against worker.id
-                            workerStatusMap[data['shiftUserID']] = data['shiftStatus'] ?? 'pending';
-                          }
+                                  Map<String, String> workerStatusMap = {};
+                                  for (var doc in activeShifts) {
+                                    var data = doc.data() as Map<String, dynamic>;
+                                    workerStatusMap[data['shiftUserID']] = data['shiftStatus'] ?? 'pending';
+                                  }
 
-                          return _buildCard(
-                            color: Colors.white,
-                            child: Column(
-                              children: [
-                                const Text("Worker List", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                                const Divider(color: Color(0xFF1A3E88)),
-                                ListView.builder(
-                                  shrinkWrap: true,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  itemCount: workers.length,
-                                  itemBuilder: (context, index) {
-                                    var workerData = workers[index].data() as Map<String, dynamic>;
-                                    String name = "${workerData['userFName']} ${workerData['userLName']}";
-                                    
-                                    // THIS IS THE DOCUMENT ID (UserID)
-                                    String workerID = workers[index].id; 
-                                    
-                                    // Lookup status from our map
-                                    String status = workerStatusMap[workerID] ?? "none";
+                                  return ListView.builder(
+                                    shrinkWrap: true,
+                                    physics: const NeverScrollableScrollPhysics(),
+                                    itemCount: workers.length,
+                                    itemBuilder: (context, index) {
+                                      var workerData = workers[index].data() as Map<String, dynamic>;
+                                      String name = "${workerData['userFName']} ${workerData['userLName']}";
+                                      String workerID = workers[index].id;
+                                      String status = workerStatusMap[workerID] ?? "none";
 
-                                    return _buildWorkerRow(name, status, workerID);
-                                  },
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      );
-                    },
-                  )
-                : _buildCard(
-                    color: bgLightBlue,
-                    child: const Center(child: Text("Select a date to view shift status")),
-                  ),
+                                      return _buildWorkerRow(name, status, workerID);
+                                    },
+                                  );
+                                },
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    )
+                  : _buildCard(
+                      color: bgLightBlue,
+                      child: const Center(child: Text("Select a date to view shift status")),
+                    ),
 
               // 3. Leave Requests (Scrollable Version)
-              // TODO: link employee's activity within the activity card
               _buildCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -251,7 +245,6 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
     );
   }
 
-  // --- HELPERS ---
   // Helper for Cards
   Widget _buildCard({required Widget child, Color? color}) {
     return Container(
@@ -274,29 +267,8 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
     );
   }
 
-  // Helper for Summary Rows
-  Widget _buildStatRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          Container(
-            width: 60,
-            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
-            decoration: BoxDecoration(
-              border: Border.all(color: primaryBlue),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(value, textAlign: TextAlign.center, style: TextStyle(color: Colors.blueGrey, fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // Helper for Worker Rows
+  // --- Shift Assignment ---
+  // Helper for Building Worker Rows
   Widget _buildWorkerRow(String name, String status, String workerID) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -311,6 +283,7 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
     );
   }
 
+  // Helper for Building Worker Status
   Widget _buildStatusAction(String status, String workerName, String workerID) {
     switch (status) {
       case 'none':
@@ -380,6 +353,7 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
     }
   }
 
+  // Feature - Assign shift to a worker
   void _assignShiftAction(String workerID, String workerName) {
     showDialog(
       context: context,
@@ -428,10 +402,11 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
             ),
           ),
           actions: [
+            // Cancel Shift
             TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+            // Confirm Shift
             ElevatedButton(
               onPressed: () async {
-              // --- FIXED CALL HERE ---
               // Mapping your local variables to the function parameters
               await _submitShiftToFirestore(
                 workerID: workerID, 
@@ -450,6 +425,28 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
     );
   }
 
+  // Feature - Submit Assigned Shift
+  Future<void> _submitShiftToFirestore({
+    required String workerID,
+    required String taskName,
+  }) async {
+    // Convert TimeOfDay to String for easy storage
+    String startStr = _startTime.format(context); 
+    String endStr = _endTime.format(context);
+
+    await FirebaseFirestore.instance.collection('shifts').add({
+      'shiftDate': Timestamp.fromDate(_selectedDay!), 
+      'shiftStartTime': startStr,
+      'shiftEndTime': endStr,
+      'shiftStatus': 'pending',
+      'shiftUserID': workerID,
+      'shiftTask': taskName,
+      'deptCode': widget.deptCode, // Using widget.deptCode from the constructor
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  // Feature - Confirm Before Removing a Shift Under Status [pending, accepted, rejected]
   void _removeShiftConfirmation(String workerID){
     showDialog(
       context: context,
@@ -476,6 +473,7 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
     );
   }
 
+  // Feature - Remove a Shift After Confirmation
   void _removeShiftAction(String workerID) async {
     // Find the shift for this user on this day and delete it
     var snapshot = await FirebaseFirestore.instance
@@ -489,23 +487,25 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
     }
   }
 
-  Future<void> _submitShiftToFirestore({
-    required String workerID,
-    required String taskName,
-  }) async {
-    // Convert TimeOfDay to String for easy storage
-    String startStr = _startTime.format(context); 
-    String endStr = _endTime.format(context);
-
-    await FirebaseFirestore.instance.collection('shifts').add({
-      'shiftDate': Timestamp.fromDate(_selectedDay!), 
-      'shiftStartTime': startStr,
-      'shiftEndTime': endStr,
-      'shiftStatus': 'pending',
-      'shiftUserID': workerID,
-      'shiftTask': taskName,
-      'deptCode': widget.deptCode, // Using widget.deptCode from the constructor
-      'createdAt': FieldValue.serverTimestamp(),
-    });
+  // Helper for Summary Rows
+  Widget _buildStatRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          Container(
+            width: 60,
+            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
+            decoration: BoxDecoration(
+              border: Border.all(color: primaryBlue),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(value, textAlign: TextAlign.center, style: TextStyle(color: Colors.blueGrey, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 }
