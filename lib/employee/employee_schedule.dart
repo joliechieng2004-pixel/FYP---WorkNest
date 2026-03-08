@@ -280,10 +280,20 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
                     ] 
                     
                     else ...[
-                      // 3. If pending, both buttons are clickable and outlined
-                      _buildActionButton("Accept", Colors.green, () => _updateStatus(docID, 'accepted'), false),
+                      // 3. If pending, both buttons trigger the confirmation dialog first
+                      _buildActionButton(
+                        "Accept", 
+                        Colors.green, 
+                        () => _showStatusConfirmation(docID, 'accepted'), // Changed
+                        false
+                      ),
                       const SizedBox(height: 10),
-                      _buildActionButton("Reject", Colors.red, () => _updateStatus(docID, 'rejected'), false),
+                      _buildActionButton(
+                        "Reject", 
+                        Colors.red, 
+                        () => _showStatusConfirmation(docID, 'rejected'), // Changed
+                        false
+                      ),
                     ],
                   ],
                 ),
@@ -315,9 +325,12 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
           ),
           const Divider(color: Color(0xFF1A3E88)),
           const SizedBox(height: 10),
-          const Text(
-            "No shift assigned for this date.",
-            style: TextStyle(color: Colors.grey, fontSize: 15),
+          Row(
+            children: [
+              const Icon(Icons.event_busy, size: 50, color: Colors.grey),
+              const SizedBox(width: 10),
+              const Text("No shift assigned for this date.", style: TextStyle(color: Colors.grey, fontSize: 15)),
+            ],
           ),
           const Divider(height: 30),
           
@@ -368,6 +381,34 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
         child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+      ),
+    );
+  }
+
+  void _showStatusConfirmation(String docID, String newStatus) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text("Confirm ${newStatus[0].toUpperCase()}${newStatus.substring(1)}"),
+        content: Text("Are you sure you want to $newStatus this shift? This action may be permanent."),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context); // Close dialog
+              _updateStatus(docID, newStatus); // Perform update
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: newStatus == 'accepted' ? Colors.green : Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text("Confirm"),
+          ),
+        ],
       ),
     );
   }
