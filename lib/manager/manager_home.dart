@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:worknest/manager/manager_report.dart';
 import 'package:worknest/manager/manager_schedule.dart';
 import 'package:worknest/services/auth_service.dart';
 import 'package:geolocator/geolocator.dart';
@@ -131,7 +132,7 @@ class _ManagerHomePageState extends State<ManagerHome> {
       _buildHomeDashboard(context),                         // Index 0 - Home Page
       ManagerSchedule(deptCode: deptCode),                  // Index 1 - Schedule Page
       ManagerEmployee(deptCode: deptCode),                  // Index 2 - Employee Page
-      const Center(child: Text("Tasks Page")),              // Index 3
+      ManagerReportPage(deptCode: deptCode),                                  // Index 3 - Report Page
       const Center(child: Text("Profile Page")),            // Index 4
     ];
 
@@ -380,6 +381,7 @@ class _ManagerHomePageState extends State<ManagerHome> {
     }
   }
 
+  // --- Clock Out ---
   void _clockOutLogic() async {
     User? user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
