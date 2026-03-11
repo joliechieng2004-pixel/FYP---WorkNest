@@ -18,6 +18,9 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
   final Color primaryBlue = const Color.fromARGB(255, 40, 75, 158);
   final Color bgLightBlue = const Color.fromARGB(255, 240, 250, 255);
   
+  late Stream<QuerySnapshot> _shiftStream;
+  late Stream<QuerySnapshot> _userStream;
+
   // Calendar
   CalendarFormat _calendarFormat = CalendarFormat.month;
   DateTime _focusedDay = DateTime.now();
@@ -38,6 +41,16 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
   @override
   void initState() {
     super.initState();
+    _shiftStream = FirebaseFirestore.instance
+            .collection('shifts')
+            .where('deptCode', isEqualTo: widget.deptCode)
+            .where('shiftDate', isEqualTo: Timestamp.fromDate(_selectedDay!))
+            .snapshots();
+    _userStream = FirebaseFirestore.instance
+            .collection('users')
+            .where('deptCode', isEqualTo: widget.deptCode)
+            .where('userRole', isEqualTo: 'employee')
+            .snapshots();
     _selectedDay = DateTime.now(); // Default selection to today
   }
 
@@ -122,18 +135,10 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
                           
                           // Now only the list contents respond to the Stream
                           StreamBuilder<QuerySnapshot>(
-                            stream: FirebaseFirestore.instance
-                                .collection('shifts')
-                                .where('deptCode', isEqualTo: widget.deptCode)
-                                .where('shiftDate', isEqualTo: Timestamp.fromDate(_selectedDay!))
-                                .snapshots(),
+                            stream: _shiftStream,
                             builder: (context, shiftSnapshot) {
                               return StreamBuilder<QuerySnapshot>(
-                                stream: FirebaseFirestore.instance
-                                    .collection('users')
-                                    .where('deptCode', isEqualTo: widget.deptCode)
-                                    .where('userRole', isEqualTo: 'employee')
-                                    .snapshots(),
+                                stream: _userStream,
                                 builder: (context, userSnapshot) {
                                   // This loading indicator is now inside the card!
                                   if (userSnapshot.connectionState == ConnectionState.waiting) {

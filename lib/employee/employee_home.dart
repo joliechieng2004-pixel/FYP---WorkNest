@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:worknest/config.dart';
+import 'package:worknest/employee/employee_report.dart';
 import 'package:worknest/employee/employee_schedule.dart';
 import 'package:worknest/services/auth_service.dart';
 import 'package:geolocator/geolocator.dart';
@@ -132,7 +133,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
     final List<Widget> pages = [
       _buildHomeDashboard(context),                         // Index 0 - Home Page
       EmployeeSchedule(deptCode: deptCode, workerID: workerID),                  // Index 1 - Schedule Page
-      const Center(child: Text("Tasks Page")),              // Index 2
+      EmployeeReport(deptCode: deptCode, workerID: workerID),
       const Center(child: Text("Profile Page")),            // Index 3
     ];
 

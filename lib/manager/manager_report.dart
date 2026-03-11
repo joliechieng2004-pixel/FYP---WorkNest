@@ -34,7 +34,7 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
       length: 2, // Number of tabs
       child: Scaffold(
         appBar: AppBar(
-          title: const Text("Manager Reports"),
+          title: const Text("Manage Reports"),
           centerTitle: true,
           backgroundColor: primaryBlue,
           foregroundColor: Colors.white,
@@ -153,28 +153,6 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
     );
   }
 
-
-    //         return ListTile(
-    //           leading: CircleAvatar(
-    //             backgroundColor: primaryBlue.withOpacity(0.1),
-    //             child: Icon(Icons.person, color: primaryBlue),
-    //           ),
-    //           title: Text(data['workerName'] ?? "Unknown Employee", 
-    //             style: const TextStyle(fontWeight: FontWeight.bold)),
-    //           subtitle: Text("Clock-in: ${DateFormat('jm').format(time)}"),
-    //           trailing: Column(
-    //             mainAxisAlignment: MainAxisAlignment.center,
-    //             crossAxisAlignment: CrossAxisAlignment.end,
-    //             children: [
-    //               Text(DateFormat('dd MMM').format(time)),
-    //               const Icon(Icons.check_circle, color: Colors.green, size: 16),
-    //             ],
-    //           ),
-    //         );
-    //       },
-    //     );
-    //   },
-    // );
   // Each individual Attendance Row that expands
   Widget _buildExpandableAttendanceRow(DocumentSnapshot doc, int index) {
     Map<String, dynamic> attendance = doc.data() as Map<String, dynamic>;
@@ -255,7 +233,18 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
                 ),
                 Expanded(flex: 3, child: Center(child: Text(formattedDate))),
                 Expanded(flex: 3, child: Center(child: Text(workerName))),
-                Expanded(flex: 2, child: Center(child: Text(status))),
+                Expanded(flex: 2, child: Center(
+                  child: Text(
+                    status,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: status == "Approved" 
+                          ? Colors.green 
+                          : status == "Rejected" 
+                              ? Colors.red 
+                              : Colors.orange, // Orange for "Pending"
+                    ),
+                  ))),
                 Expanded(flex: 1, child: Icon(isExpanded ? Icons.expand_less : Icons.expand_more, size: 18)),
               ],
             ),
@@ -277,9 +266,9 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _actionButton("Reject", Colors.red, () => print("Reject $workerName")),
+                      _actionButton("Reject", Colors.red, () => _updateAttendanceStatus(doc.id, "Rejected")),
                       const SizedBox(width: 20),
-                      _actionButton("Accept", Colors.green, () => print("Accept $workerName")),
+                      _actionButton("Approve", Colors.green, () => _updateAttendanceStatus(doc.id, "Approved")),
                     ],
                   ),
                 ],
@@ -337,4 +326,33 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
   }
 
   void onChanged(bool? value) {}
+  
+  Future<void> _updateAttendanceStatus(String docId, String newStatus) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('attendances')
+          .doc(docId)
+          .update({
+        'attendanceStatus': newStatus,
+      });
+
+      // Show a small confirmation to the manager
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Attendance $newStatus"),
+            backgroundColor: newStatus == "Approved" ? Colors.green : Colors.red,
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint("Error updating status: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Failed to update status")),
+        );
+      }
+    }
+  }
 }

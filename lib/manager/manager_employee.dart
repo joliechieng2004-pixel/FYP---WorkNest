@@ -14,6 +14,19 @@ class ManagerEmployee extends StatefulWidget {
 class _ManagerEmployeePageState extends State<ManagerEmployee> {
   // Track which worker is currently expanded
   int? _expandedIndex;
+  
+  late Stream<QuerySnapshot> _userStream;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _userStream = FirebaseFirestore.instance
+            .collection('users')
+            .where('deptCode', isEqualTo: widget.deptCode)
+            .where('userRole', isEqualTo: 'employee') // Only show employees
+            .snapshots();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -61,11 +74,7 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
                     // Scrollable List of Workers
                     Expanded(
                       child: StreamBuilder<QuerySnapshot>(
-                        stream: FirebaseFirestore.instance
-                            .collection('users')
-                            .where('deptCode', isEqualTo: widget.deptCode)
-                            .where('userRole', isEqualTo: 'employee') // Only show employees
-                            .snapshots(),
+                        stream: _userStream,
                         builder: (context, snapshot) {
                           if (snapshot.hasError) {
                             return const Center(child: Text("Something went wrong"));

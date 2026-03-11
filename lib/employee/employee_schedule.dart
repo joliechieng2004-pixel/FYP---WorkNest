@@ -19,6 +19,8 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
   final Color primaryBlue = const Color.fromARGB(255, 40, 75, 158);
   final Color bgLightBlue = const Color.fromARGB(255, 240, 250, 255);
   
+  late Stream<QuerySnapshot> _shiftStream;
+
   // Calendar
   CalendarFormat _calendarFormat = CalendarFormat.month;
   DateTime _focusedDay = DateTime.now();
@@ -37,6 +39,11 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
     super.initState();
     _selectedDay = DateTime.now(); // Default selection to today
     _isDateSelected = true;
+    _shiftStream = FirebaseFirestore.instance
+        .collection('shifts')
+        .where('shiftUserID', isEqualTo: widget.workerID) // Only this worker
+        .where('shiftDate', isEqualTo: Timestamp.fromDate(_selectedDay!))
+        .snapshots();
   }
 
   @override
@@ -113,11 +120,7 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
               // 2. Shift List for Employee
               _isDateSelected
                   ? StreamBuilder<QuerySnapshot>(
-                      stream: FirebaseFirestore.instance
-                          .collection('shifts')
-                          .where('shiftUserID', isEqualTo: widget.workerID) // Only this worker
-                          .where('shiftDate', isEqualTo: Timestamp.fromDate(_selectedDay!))
-                          .snapshots(),
+                      stream: _shiftStream,
                       builder: (context, snapshot) {
                         if (snapshot.connectionState == ConnectionState.waiting) {
                           return const Center(child: CircularProgressIndicator());
