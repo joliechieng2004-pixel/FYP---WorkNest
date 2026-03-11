@@ -5,8 +5,6 @@ import 'package:worknest/login.dart';
 import 'package:worknest/manager/manager_home.dart';
 import 'package:worknest/register.dart';
 import 'firebase_options.dart';
-//import 'package:worknest/manager/manager_home.dart';
-//import 'package:worknest/splash.dart';
 
 void main() async {
   // 1. This line ensures all Flutter widgets are loaded before starting Firebase

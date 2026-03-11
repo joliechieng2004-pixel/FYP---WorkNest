@@ -201,6 +201,13 @@ class AuthService {
     required GeoPoint location,
   }) async {
     try {
+      // Fetch User Name
+      DocumentSnapshot userDoc = await _db.collection('users').doc(uid).get();
+      if (!userDoc.exists) return "User profile not found.";
+      
+      Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
+      String fullName = "${userData['userFName']} ${userData['userLName']}";
+
       // 1. Create a unique ID for the day (e.g., 2026-02-27_UserID)
       String dateId = DateFormat('yyyy-MM-dd').format(DateTime.now());
       String docId = "${dateId}_$uid";
@@ -214,8 +221,9 @@ class AuthService {
         'attendanceStartTime': FieldValue.serverTimestamp(),
         'attendanceEndTime': null, // Empty until they clock out
         'attendanceLocation': location, // Placeholder for now
-        'attendanceStatus': "Present",
+        'attendanceStatus': "Pending",
         'attendanceUserID': uid,
+        'attendanceUserName': fullName,
         'deptCode': deptCode, // Crucial for Manager filtering
       });
       

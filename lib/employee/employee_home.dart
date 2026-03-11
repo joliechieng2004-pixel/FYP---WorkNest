@@ -3,9 +3,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:worknest/config.dart';
 import 'package:worknest/employee/employee_schedule.dart';
 import 'package:worknest/services/auth_service.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:worknest/widget/face_verification.dart';
 
 class EmployeeHome extends StatefulWidget {
   const EmployeeHome({super.key});
@@ -326,6 +328,8 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
   void _clockIn() async {
     User? user = FirebaseAuth.instance.currentUser;
 
+    bool canProceed = true;
+
     if (user != null) {
       try {
         showDialog(
@@ -355,6 +359,19 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
             deptCode: deptCode,
             location: currentGeoPoint, // Pass this once you uncomment GPS logic
           );
+
+          if (AppConfig.useFaceVerificationStub) {
+            // Wait for the stub screen to return 'true'
+            canProceed = await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const FaceVerification()),
+            ) ?? false;
+          }
+
+          if (canProceed) {
+            // Run your existing successful Clock-In logic here
+            _authService.clockInUser(uid: user.uid, deptCode: deptCode, location: currentGeoPoint);
+          }
 
           Navigator.pop(context); // Close loading indicator
 
