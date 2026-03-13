@@ -74,7 +74,3 @@ flutter run
 ## Author
 
 **Jolie Chieng Chiao Lie** *Final Year Software Engineering Student @ SEGi University* Expected Graduation: September 2026
-
----
-
-**Would you like me to add a "Project Roadmap" section to the README to show the examiners what features you plan to add after graduation?**
