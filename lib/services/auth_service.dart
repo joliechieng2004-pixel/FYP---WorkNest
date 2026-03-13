@@ -47,6 +47,11 @@ class AuthService {
           'userRole': 'manager', // Hardcoded as Manager
           'deptCode': newCode,
           'createdAt': FieldValue.serverTimestamp(),
+          'settings': {
+            'notifyOnCheckIn': true,
+            'notifyOnLate': true,
+            'notifyOnAbsent': true,
+          },
         });
 
         // TODO: code for register office location for attendance later
@@ -100,6 +105,7 @@ class AuthService {
           'deptCode': managerDeptCode,
           'isActive': true,
           'createdAt': FieldValue.serverTimestamp(),
+          'settings': {'notifyShift': 15,}
         });
 
         // 3. Increment the department count

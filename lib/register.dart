@@ -195,7 +195,7 @@ class _RegisterPageState extends State<RegisterPage> {
             focusedBorder: OutlineInputBorder(
               borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
               borderRadius: BorderRadius.circular(20)
-              )
+            )
           ),
         ),
       ],

@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:worknest/config.dart';
+import 'package:worknest/employee/employee_profile.dart';
 import 'package:worknest/employee/employee_report.dart';
 import 'package:worknest/employee/employee_schedule.dart';
 import 'package:worknest/services/auth_service.dart';
@@ -72,7 +73,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
     super.dispose(); 
   }
 
-  // Fetch the current manager's department details
+  // Fetch the current employee's department details
   Future<void> _loadEmployeeData() async {
     User? user = FirebaseAuth.instance.currentUser;
     if (user != null) {
@@ -131,10 +132,10 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
     
     // 1. Define the pages
     final List<Widget> pages = [
-      _buildHomeDashboard(context),                         // Index 0 - Home Page
-      EmployeeSchedule(deptCode: deptCode, workerID: workerID),                  // Index 1 - Schedule Page
-      EmployeeReport(deptCode: deptCode, workerID: workerID),
-      const Center(child: Text("Profile Page")),            // Index 3
+      _buildHomeDashboard(context),                               // Index 0 - Home Page
+      EmployeeSchedule(deptCode: deptCode, workerID: workerID),   // Index 1 - Schedule Page
+      EmployeeReport(deptCode: deptCode, workerID: workerID),     // Index 2 - Report Page
+      EmployeeProfile(deptCode: deptCode, workerID: workerID),    // Index 3 - Profile Page
     ];
 
     return Scaffold(
@@ -200,31 +201,6 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
               ]),
 
             const SizedBox(height: 10),
-        
-            // 1. Worker ID Card
-            _buildCard(
-              color: Colors.blue.shade50,
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: 2,
-                    child: const Text(
-                      "Worker ID:",
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold))),
-                  Expanded(
-                    flex: 8,
-                    child: SelectableText(
-                      workerID, 
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: primaryBlue,
-                        letterSpacing: 5),
-                    ),
-                  ),
-                ],
-              ),
-            ),
 
             // 2. Clock In Card
             _buildCard(
