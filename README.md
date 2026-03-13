@@ -46,7 +46,7 @@ WorkNest utilizes a **NoSQL Denormalization Strategy** to optimize performance. 
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/yourusername/worknest.git
+git clone https://github.com/joliechieng2004-pixel/FYP---WorkNest.git
 
 ```
 
@@ -71,7 +71,7 @@ flutter run
 ```
 
 
-## 👨‍💻 Author
+## Author
 
 **Jolie Chieng Chiao Lie** *Final Year Software Engineering Student @ SEGi University* Expected Graduation: September 2026
 
