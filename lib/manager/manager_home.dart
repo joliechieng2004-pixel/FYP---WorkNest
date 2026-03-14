@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:worknest/config.dart';
+import 'package:worknest/manager/manager_profile.dart';
 import 'package:worknest/manager/manager_report.dart';
 import 'package:worknest/manager/manager_schedule.dart';
 import 'package:worknest/services/auth_service.dart';
@@ -134,8 +135,8 @@ class _ManagerHomePageState extends State<ManagerHome> {
       _buildHomeDashboard(context),                         // Index 0 - Home Page
       ManagerSchedule(deptCode: deptCode),                  // Index 1 - Schedule Page
       ManagerEmployee(deptCode: deptCode),                  // Index 2 - Employee Page
-      ManagerReportPage(deptCode: deptCode),                                  // Index 3 - Report Page
-      const Center(child: Text("Profile Page")),            // Index 4
+      ManagerReportPage(deptCode: deptCode),                // Index 3 - Report Page
+      ManagerProfile(deptCode: deptCode),                   // Index 4 - Profile Page
     ];
 
     return Scaffold(

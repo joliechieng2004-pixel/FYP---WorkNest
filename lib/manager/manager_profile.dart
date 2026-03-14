@@ -1,18 +1,19 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:worknest/widget/location_picker.dart';
 
-class EmployeeProfile extends StatefulWidget {
+class ManagerProfile extends StatefulWidget {
   final String deptCode;
-  final String workerID;
 
-  const EmployeeProfile({super.key, required this.deptCode, required this.workerID});
+  const ManagerProfile({super.key, required this.deptCode});
 
   @override
-  State<EmployeeProfile> createState() => _EmployeeProfilePageState();
+  State<ManagerProfile> createState() => _ManagerProfilePageState();
 }
 
-class _EmployeeProfilePageState extends State<EmployeeProfile> {
+class _ManagerProfilePageState extends State<ManagerProfile> {
   // often use colors
   final Color primaryBlue = const Color.fromARGB(255, 40, 75, 158);
   final Color bgLightBlue = const Color.fromARGB(255, 240, 250, 255);
@@ -39,6 +40,10 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
   String email = "Email";
   String contact = "0XX-XXXXXXX";
 
+  double? selectedLat;
+  double? selectedLng;
+  String addressName = "Unknown Location";
+
   int _expandedIndex = 0;
 
   // --- INITIALIZATION ---
@@ -50,7 +55,7 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
   }
 
   void _initializeData() async {
-    await _loadEmployeeData();
+    await _loadManagerData();
   }
 
   @override
@@ -65,7 +70,7 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
   }
 
    // Fetch the current employee's department details
-  Future<void> _loadEmployeeData() async {
+  Future<void> _loadManagerData() async {
     User? user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       DocumentSnapshot userDoc = await FirebaseFirestore.instance
@@ -81,7 +86,7 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
         if (!mounted) return;
 
         setState(() {
-          userRole = data['userRole'] ?? "employee";
+          userRole = data['userRole'] ?? "manager";
           
           // Load settings with defaults if they don't exist
           notifyShift = (settings['notifyShift'] ?? 0).toInt();
@@ -121,7 +126,7 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Worker Profile
+              // Manager Profile
               _buildCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -323,6 +328,7 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
                       expandedChild: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          // Radio Buttons for Reminder
                           if (userRole == "employee") ...[
                             const Text("Shift Reminder", 
                                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color.fromARGB(255, 40, 75, 158))),
@@ -338,7 +344,6 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
 
                           // Manager Specific Alerts
                           if (userRole == "manager") ...[
-                            const Divider(height: 30),
                             const Text("Attendance Alerts", 
                                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color.fromARGB(255, 40, 75, 158))),
                             const SizedBox(height: 10),
@@ -362,7 +367,105 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
                                 child: const Text("Cancel")
                               ),
                               ElevatedButton(
-                                onPressed: _updateNotificationSettings, 
+                                onPressed: _updateSettingsAndLocation, 
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color.fromARGB(255, 40, 75, 158),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
+                                ),
+                                child: const Text("Save Settings")
+                              )
+                            ]
+                          )
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // 2. Expandable Department Settings Card
+              _buildCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("Department Settings", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                    const Divider(),
+                    _buildExpandableSetting(
+                      index: 4,
+                      title: "Attendance Settings",
+                      icon: Icons.notifications_none,
+                      expandedChild: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Office Location
+                          const Text(
+                            "Office Location",
+                            style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Color.fromARGB(255, 40, 75, 158)),
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              ElevatedButton.icon(
+                                // Change: Now calls the Map Picker instead of just GPS
+                                onPressed: () => _pickLocationFromMap(context), 
+                                icon: const Icon(Icons.map_rounded),
+                                label: const Text("Select on Map"),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  selectedLat != null
+                                      ? "Lat: ${selectedLat!.toStringAsFixed(4)}, Long: ${selectedLng!.toStringAsFixed(4)}"
+                                      : "Location not set",
+                                  style: TextStyle(color: Colors.grey[700]),
+                                ),
+                              ),
+                            ],
+                          ),
+
+                          // Location Verification
+                            const Text("Location Verification", 
+                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color.fromARGB(255, 40, 75, 158))),
+                            const SizedBox(height: 10),
+                            _buildSwitchOption("Require for clock in", notifyCheckIn, (val) => setState(() => notifyCheckIn = val)),
+                            _buildSwitchOption("Require for clock out", notifyLate, (val) => setState(() => notifyLate = val)),
+
+                          // Face Verification
+                            const Text("Face Verification", 
+                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color.fromARGB(255, 40, 75, 158))),
+                            const SizedBox(height: 10),
+                            _buildSwitchOption("Require for clock in", notifyCheckIn, (val) => setState(() => notifyCheckIn = val)),
+                            _buildSwitchOption("Require for clock out", notifyLate, (val) => setState(() => notifyLate = val)),
+
+                          // Grace Period
+                            const Text("Grace Period", 
+                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color.fromARGB(255, 40, 75, 158))),
+                            const SizedBox(height: 10),
+                            _buildSwitchOption("Notify on Check-in", notifyCheckIn, (val) => setState(() => notifyCheckIn = val)),
+                            _buildSwitchOption("Notify on Late", notifyLate, (val) => setState(() => notifyLate = val)),
+
+                          const SizedBox(height: 20),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              ElevatedButton(
+                                onPressed: _cancelEdit,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color.fromARGB(255, 40, 75, 158),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
+                                ),
+                                child: const Text("Cancel")
+                              ),
+                              ElevatedButton(
+                                onPressed: _updateSettingsAndLocation, 
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color.fromARGB(255, 40, 75, 158),
                                   foregroundColor: Colors.white,
@@ -582,9 +685,14 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
     );
   }
 
-  Future<void> _updateNotificationSettings() async {
+  Future<void> _updateSettingsAndLocation() async {
     try {
-      await _db.collection('users').doc(docID).update({
+      // 1. Create a Write Batch to ensure both updates succeed or both fail
+      WriteBatch batch = _db.batch();
+
+      // 2. Reference for User Settings
+      DocumentReference userRef = _db.collection('users').doc(docID);
+      batch.update(userRef, {
         'settings.notifyShift': notifyShift,
         if (userRole == "manager") ...{
           'settings.notifyCheckIn': notifyCheckIn,
@@ -592,8 +700,24 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
           'settings.notifyAbsent': notifyAbsent,
         }
       });
-      _showSnackBar("Settings updated successfully!", Colors.green);
-      setState(() => _expandedIndex = 0); // Collapse the card
+
+      // 3. Reference for Department Location (if user is a manager and location is set)
+      if (userRole == "manager" && selectedLat != null && selectedLng != null) {
+        // Ensure you have the departmentId variable available in your class
+        DocumentReference deptRef = _db.collection('departments').doc(deptCode);
+        
+        batch.update(deptRef, {
+          'officeLocation': GeoPoint(selectedLat!, selectedLng!),
+          'officeAddress': addressName,
+          'updatedAt': FieldValue.serverTimestamp(), // Good practice for FYP
+        });
+      }
+
+      // 4. Commit the batch
+      await batch.commit();
+
+      _showSnackBar("All settings and location updated!", Colors.green);
+      setState(() => _expandedIndex = 0); 
     } catch (e) {
       _showSnackBar("Update failed: $e", Colors.red);
     }
@@ -610,5 +734,23 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
       // 2. Collapse the card
       _expandedIndex = 0;
     });
+  }
+
+  Future<void> _pickLocationFromMap(BuildContext context) async {
+    // Navigate to the screen we created in the previous step
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const LocationPicker()),
+    );
+
+    // If the user picked a location and didn't just press 'back'
+    if (result != null && result is Map<String, dynamic>) {
+      setState(() {
+        selectedLat = result['lat'];
+        selectedLng = result['lng'];
+        // If you have an address controller, you can update it here too:
+        addressName = result['address'];
+      });
+    }
   }
 }
