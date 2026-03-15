@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:worknest/widget/location_picker.dart';
 
 class ManagerProfile extends StatefulWidget {
@@ -40,6 +39,8 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
   String email = "Email";
   String contact = "0XX-XXXXXXX";
 
+  bool isWaitingForVerification = false;
+
   double? selectedLat;
   double? selectedLng;
   String addressName = "Unknown Location";
@@ -56,6 +57,19 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
 
   void _initializeData() async {
     await _loadManagerData();
+    DocumentSnapshot userDoc = await _db.collection('users').doc(docID).get();
+  
+    if (userDoc.exists) {
+      setState(() {
+        // Get the deptCode from the user document
+        deptCode = userDoc.get('deptCode') ?? ""; 
+      });
+      
+      // Step 2: Now that we have the code, get the office location
+      if (deptCode.isNotEmpty) {
+        await _loadOfficeData();
+      }
+    }
   }
 
   @override
@@ -69,7 +83,45 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
     super.dispose(); 
   }
 
-   // Fetch the current employee's department details
+  Future<void> _loadOfficeData() async {
+    if (deptCode.isEmpty) {
+      print("DEBUG: deptCode is empty. Waiting for user data...");
+      // If it's empty, we might need to fetch the user profile first
+      await _loadManagerData(); 
+    }
+    try {
+      // 1. Get the document from the 'departments' collection
+      DocumentSnapshot deptDoc = await _db.collection('departments').doc(deptCode).get();
+
+      if (deptDoc.exists && deptDoc.data() != null) {
+        Map<String, dynamic> data = deptDoc.data() as Map<String, dynamic>;
+
+        print("DEBUG: Found department: ${deptDoc.id}");
+
+        // 2. Extract the GeoPoint and Address
+        // Note: Firebase stores location as a 'GeoPoint' type
+        GeoPoint? geoPoint = data['officeLocation']; 
+        String? savedAddress = data['officeAddress'];
+
+        // 3. Update the UI state
+        setState(() {
+          if (geoPoint != null) {
+            selectedLat = geoPoint.latitude;
+            selectedLng = geoPoint.longitude;
+          }
+          addressName = savedAddress ?? "No address set";
+        });
+      } else {
+        print("DEBUG: No document found at departments/$deptCode");
+        setState(() => addressName = "Department Not Found ($deptCode)");
+      }
+    } catch (e) {
+      print("Error loading office data: $e");
+      setState(() => addressName = "Error loading location");
+    }
+  }
+
+  // Fetch the current employee's department details
   Future<void> _loadManagerData() async {
     User? user = FirebaseAuth.instance.currentUser;
     if (user != null) {
@@ -199,8 +251,33 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                               ),
                             ],
                           ),
-                          SizedBox(height: 10),
-                          Text("Email:", style: TextStyle(fontSize: 18)),
+                          Row(
+                            children: [
+                              const SizedBox(height: 10),
+                              const Text("Email:", style: TextStyle(fontSize: 18)),
+                              const SizedBox(width: 8),
+                              
+                              // Dynamic Status Indicator
+                              if (isWaitingForVerification || !(FirebaseAuth.instance.currentUser?.emailVerified ?? false)) ...[
+                                const Text("(Pending Verification)", 
+                                    style: TextStyle(color: Colors.orange, fontSize: 12, fontWeight: FontWeight.w500)),
+                                const SizedBox(width: 4),
+                                GestureDetector(
+                                  onTap: _refreshVerificationStatus,
+                                  child: const Icon(Icons.refresh, color: Color.fromARGB(255, 40, 75, 158), size: 18),
+                                ),
+                              ]
+                              else ...[
+                                const Icon(Icons.verified, color: Colors.green, size: 20),
+                                const SizedBox(width: 4),
+                                // The Refresh Button
+                                GestureDetector(
+                                  onTap: _refreshVerificationStatus,
+                                  child: const Icon(Icons.refresh, color: Color.fromARGB(255, 40, 75, 158), size: 18),
+                                ),
+                              ],
+                            ],
+                          ),
                           TextFormField(
                             controller: _profileEmailController,
                             decoration: InputDecoration(
@@ -419,12 +496,22 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                               ),
                               const SizedBox(width: 10),
                               Expanded(
-                                child: Text(
-                                  selectedLat != null
-                                      ? "Lat: ${selectedLat!.toStringAsFixed(4)}, Long: ${selectedLng!.toStringAsFixed(4)}"
-                                      : "Location not set",
-                                  style: TextStyle(color: Colors.grey[700]),
-                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      "Current Address:",
+                                      style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey[600]),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      addressName, // This will now show the Firestore value on load
+                                      style: const TextStyle(fontSize: 16, color: Colors.black87),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    // ... your "Select on Map" button code here ...
+                                  ],
+                                )
                               ),
                             ],
                           ),
@@ -592,34 +679,124 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
     try {
       User? user = FirebaseAuth.instance.currentUser;
       String newEmail = _profileEmailController.text.trim();
+      String oldEmail = user?.email ?? "";
 
-      // 1. Update the actual Login Credential first
-      if (user != null && user.email != newEmail) {
-        // Modern Firebase way: Sends a verification link to the NEW email
-        // The login email ONLY changes once they click the link in their inbox
-        await user.verifyBeforeUpdateEmail(newEmail);
+      bool emailChanged = (user != null && newEmail != oldEmail);
+
+      // 1. Handle Auth Email Change if necessary
+      if (emailChanged) {
+        try {
+          await user!.verifyBeforeUpdateEmail(newEmail);
+          setState(() {
+            isWaitingForVerification = true; // Trigger the UI change
+          });
+          _showSnackBar("Verification email sent to $newEmail!", Colors.blue);
+        } on FirebaseAuthException catch (e) {
+          if (e.code == 'requires-recent-login') {
+            _showPasswordDialog(newEmail);
+            return; // EXIT: Don't update Firestore yet if re-auth is needed
+          } else {
+            _showSnackBar("Auth Error: ${e.message}", Colors.red);
+            return; // EXIT: Stop if there's another auth error
+          }
+        }
       }
 
-      // 2. Update the Firestore Database (What you already have)
+      // 2. Update Firestore
+      // NOTICE: We only update the 'userEmail' field in Firestore 
+      // IF it didn't require a re-auth, OR we can choose to keep the old email 
+      // in Firestore until they actually verify.
       await FirebaseFirestore.instance
           .collection('users')
           .doc(docID)
           .update({
         'userFName': _profileFNameController.text.trim(),
         'userLName': _profileLNameController.text.trim(),
-        'userEmail': newEmail,
         'userContact': _profileContactController.text.trim(),
+        // Option: Only update this if you want Firestore to show the "pending" email
+        'userEmail': newEmail, 
       });
 
-      // ... rest of your success logic ...
-    } on FirebaseAuthException catch (e) {
-      // Handle the "Recent Login Required" error
-      if (e.code == 'requires-recent-login') {
-        print("Please log out and log back in to change your email for security.");
-      }
+      _showSnackBar("Profile updated successfully!", Colors.green);
+      
     } catch (e) {
       print("Error: $e");
     }
+  }
+
+  Future<void> _reauthenticateAndChangeEmail(String password, String newEmail) async {
+    try {
+      User? user = FirebaseAuth.instance.currentUser;
+      AuthCredential credential = EmailAuthProvider.credential(
+        email: user!.email!, 
+        password: password
+      );
+
+      // 1. Re-authenticate
+      await user.reauthenticateWithCredential(credential);
+
+      // 2. Trigger the Verification Email
+      await user.verifyBeforeUpdateEmail(newEmail);
+
+      setState(() {
+        isWaitingForVerification = true; // Trigger the UI change
+      });
+      
+      // 3. Update Firestore NOW so the UI reflects the "Pending" change
+      await FirebaseFirestore.instance.collection('users').doc(docID).update({
+        'userEmail': newEmail,
+        'emailVerified': false, // Add this field to track status
+      });
+
+      _showSnackBar("Success! Please check $newEmail to verify your account.", Colors.blue);
+    } catch (e) {
+      _showSnackBar("Error: ${e.toString()}", Colors.red);
+    }
+  }
+
+  Future<void> _showPasswordDialog(String newEmail) async {
+    final TextEditingController _passwordController = TextEditingController();
+
+    return showDialog(
+      context: context,
+      barrierDismissible: false, // User must interact with the dialog
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Confirm Password"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text("Please enter your current password to authorize the email change."),
+              const SizedBox(height: 15),
+              TextField(
+                controller: _passwordController,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: "Password",
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                String password = _passwordController.text.trim();
+                if (password.isNotEmpty) {
+                  Navigator.pop(context);
+                  _reauthenticateAndChangeEmail(password, newEmail);
+                }
+              },
+              child: const Text("Verify & Update"),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _validateAndUpdatePassword() async {
@@ -745,12 +922,52 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
 
     // If the user picked a location and didn't just press 'back'
     if (result != null && result is Map<String, dynamic>) {
+      // check what is actually coming back from the location_picker
+      print("Map Result Recieved: $result");
+      
       setState(() {
         selectedLat = result['lat'];
         selectedLng = result['lng'];
+
         // If you have an address controller, you can update it here too:
-        addressName = result['address'];
+        var incomingAddress = result['address'];
+
+        if (incomingAddress is String && incomingAddress.isNotEmpty && incomingAddress != "{}") {
+          addressName = incomingAddress;
+        } else {
+          addressName = "Office Location (${selectedLat!.toStringAsFixed(3)})";
+        }
+
+        debugPrint("MANAGER PROFILE: Received $addressName");
       });
+
+      print("State Updated: $addressName at $selectedLat, $selectedLng");
+    }
+  }
+
+  Future<void> _refreshVerificationStatus() async {
+    try {
+      User? user = FirebaseAuth.instance.currentUser;
+      
+      // This is the key command—it forces a fetch from Firebase Auth
+      await user?.reload(); 
+
+      if (user?.emailVerified ?? false) {
+        setState(() {
+          isWaitingForVerification = false; // Switch back to the green icon
+        });
+
+        _showSnackBar("Email verified successfully!", Colors.green);
+        
+        // Also update Firestore to keep the 'emailVerified' flag in sync
+        await FirebaseFirestore.instance.collection('users').doc(docID).update({
+          'emailVerified': true,
+        });
+      } else {
+        _showSnackBar("Email not verified yet. Please check your inbox.", Colors.orange);
+      }
+    } catch (e) {
+      _showSnackBar("Error refreshing status: $e", Colors.red);
     }
   }
 }

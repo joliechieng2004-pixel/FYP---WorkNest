@@ -16,11 +16,19 @@ class LocationPicker extends StatelessWidget {
         buttonColor: const Color(0xFF284B9E),
         buttonText: 'Confirm Location',
         onPicked: (pickedData) {
+          String finalAddress = pickedData.addressName.toString();
+          
+          if (finalAddress == "{}" || finalAddress.isEmpty) {
+            finalAddress = "Lat: ${pickedData.latLong.latitude.toStringAsFixed(4)}, Lng: ${pickedData.latLong.longitude.toStringAsFixed(4)}";
+          }
+
+          debugPrint("FINAL CHECK: Sending Address -> $finalAddress");
+          
           // Returns the coordinates and address name back to the previous screen
           Navigator.pop(context, {
             'lat': pickedData.latLong.latitude,
             'lng': pickedData.latLong.longitude,
-            'address': pickedData.address,
+            'address': finalAddress,
           });
         },
       ),
