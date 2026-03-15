@@ -9,6 +9,7 @@ import 'package:worknest/employee/employee_report.dart';
 import 'package:worknest/employee/employee_schedule.dart';
 import 'package:worknest/services/auth_service.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:worknest/services/location_service.dart';
 import 'package:worknest/widget/face_verification.dart';
 
 class EmployeeHome extends StatefulWidget {
@@ -36,6 +37,8 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
 
   final ScrollController _activityScrollController = ScrollController();
 
+  double officeLat = 0.0;
+  double officeLng = 0.0;
   String deptCode = "Loading...";
   String lName = "Name";
   String workerID = "Worker ID";
@@ -45,10 +48,6 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
   // Example: Coordinates for your office
   // TODO: change to manager provided location
   // TODO: let manager provide radius allowed
-  final double officeLat = 3.145686;
-  final double officeLng = 101.579963;
-  //final double officeLat = 37.421983;
-  //final double officeLng = -122.084049;
   final double maxDistanceInMeters = 100.0; // The radius allowed (m)
 
   // --- INITIALIZATION ---
@@ -77,16 +76,54 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
   Future<void> _loadEmployeeData() async {
     User? user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      DocumentSnapshot userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
+      try {
+        // 1. Fetch User Profile to get the deptCode
+        DocumentSnapshot userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+
+        if (userDoc.exists) {
+          String fetchedDeptCode = userDoc['deptCode'];
+
+          setState(() {
+            workerID = userDoc.id;
+            deptCode = fetchedDeptCode;
+            lName = userDoc['userLName'];
+          });
+
+          // 2. Now fetch the Office Location using the fetchedDeptCode
+          await _fetchOfficeCoordinates(fetchedDeptCode);
+        }
+      } catch (e) {
+        print("Error loading employee or office data: $e");
+      }
+    }
+  }
+
+  // Separate helper function to keep your code clean
+  Future<void> _fetchOfficeCoordinates(String code) async {
+    try {
+      DocumentSnapshot deptDoc = await FirebaseFirestore.instance
+          .collection('departments')
+          .doc(code)
           .get();
-          
-      setState(() {
-        workerID = userDoc.id;
-        deptCode = userDoc['deptCode'];
-        lName = userDoc['userLName'];
-      });
+
+      if (deptDoc.exists) {
+        Map<String, dynamic> data = deptDoc.data() as Map<String, dynamic>;
+        GeoPoint? geoPoint = data['officeLocation'];
+
+        setState(() {
+          if (geoPoint != null) {
+            // These are the variables your Clock-In logic uses
+            officeLat = geoPoint.latitude; 
+            officeLng = geoPoint.longitude;
+          }
+        });
+        print("DEBUG: Office coordinates loaded for $code");
+      }
+    } catch (e) {
+      print("Error fetching department coordinates: $e");
     }
   }
 
@@ -305,7 +342,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
   void _clockIn() async {
     User? user = FirebaseAuth.instance.currentUser;
 
-    bool canProceed = true;
+    bool faceVerified = true;
 
     if (user != null) {
       try {
@@ -314,11 +351,18 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
             barrierDismissible: false,
             builder: (context) => const Center(child: CircularProgressIndicator()));
 
+        // Use our LocationService to handle permissions and get position
+        bool hasPermission = await LocationService.handleLocationPermission();
+        if (!hasPermission) {
+          Navigator.pop(context);
+          _showSnackBar("Location permissions denied.", Colors.red);
+          return;
+        }
         //1. Get User's Current GPS Position
         Position position = await _getCurrentLocation() ?? await Geolocator.getCurrentPosition();
         
         //2. Calculate Distance from Office
-        double distanceInMeters = Geolocator.distanceBetween(
+        double distanceInMeters = LocationService.getDistance(
           position.latitude, 
           position.longitude, 
           officeLat, 
@@ -327,48 +371,45 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
 
         //3. Check if user is within the allowed radius (e.g., 100m)
         if (distanceInMeters <= maxDistanceInMeters) {
-          
-          // Success: User is at the office
-          GeoPoint currentGeoPoint = GeoPoint(position.latitude, position.longitude);
-
-          String? error = await _authService.clockInUser(
-            uid: user.uid,
-            deptCode: deptCode,
-            location: currentGeoPoint, // Pass this once you uncomment GPS logic
-          );
-
+          // TODO: Placeholder for face verification
           if (AppConfig.useFaceVerificationStub) {
             // Wait for the stub screen to return 'true'
-            canProceed = await Navigator.push(
+            faceVerified = await Navigator.push(
               context,
               MaterialPageRoute(builder: (context) => const FaceVerification()),
             ) ?? false;
           }
 
-          if (canProceed) {
-            // Run your existing successful Clock-In logic here
-            _authService.clockInUser(uid: user.uid, deptCode: deptCode, location: currentGeoPoint);
+          if (faceVerified) {
+            // Success: User is at the office
+            GeoPoint currentGeoPoint = GeoPoint(position.latitude, position.longitude);
+
+            String? error = await _authService.clockInUser(
+              uid: user.uid,
+              deptCode: deptCode,
+              location: currentGeoPoint, // Pass this once you uncomment GPS logic
+            );
+
+            if (error == null) {
+              setState(() {
+                _isClockedIn = true;
+                _startTime = DateTime.now();
+              });
+
+              _startTimerTicker();
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("Clock-in successful! You are on-site."), backgroundColor: Colors.green)
+              );
+            }
           }
 
           Navigator.pop(context); // Close loading indicator
-
-          if (error == null) {
-            setState(() {
-              _isClockedIn = true;
-              _startTime = DateTime.now();
-            });
-
-            _startTimerTicker();
-
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text("Clock-in successful! You are on-site."), backgroundColor: Colors.green)
-            );
-          }
         } else {
+          // Failed: Too Far from Office
           Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Too far from office: ${distanceInMeters.toStringAsFixed(0)}m"), backgroundColor: Colors.red)
-          );
+          _showSnackBar("Too far: ${distanceInMeters.toInt()}m away.", Colors.red);
+          return;
         }
       } catch (e) {
         if (Navigator.canPop(context)) Navigator.pop(context);
@@ -526,6 +567,13 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
           Text("Location: $location", style: const TextStyle(color: Colors.black87)),
         ],
       ),
+    );
+  }
+
+  // Helper for showing messages
+  void _showSnackBar(String message, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: color),
     );
   }
 }

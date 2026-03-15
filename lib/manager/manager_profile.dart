@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:worknest/services/location_service.dart';
 import 'package:worknest/widget/location_picker.dart';
 
 class ManagerProfile extends StatefulWidget {
@@ -44,6 +46,8 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
   double? selectedLat;
   double? selectedLng;
   String addressName = "Unknown Location";
+
+  double? currentDistance;
 
   int _expandedIndex = 0;
 
@@ -472,7 +476,7 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                     _buildExpandableSetting(
                       index: 4,
                       title: "Attendance Settings",
-                      icon: Icons.notifications_none,
+                      icon: Icons.timer_outlined,
                       expandedChild: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -488,13 +492,6 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceAround,
                             children: [
-                              ElevatedButton.icon(
-                                // Change: Now calls the Map Picker instead of just GPS
-                                onPressed: () => _pickLocationFromMap(context), 
-                                icon: const Icon(Icons.map_rounded),
-                                label: const Text("Select on Map"),
-                              ),
-                              const SizedBox(width: 10),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -509,7 +506,21 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                                       style: const TextStyle(fontSize: 16, color: Colors.black87),
                                     ),
                                     const SizedBox(height: 10),
-                                    // ... your "Select on Map" button code here ...
+                                    if (currentDistance != null)
+                                      Text("Distance to Office: ${currentDistance!.toInt()}m", 
+                                        style: TextStyle(color: currentDistance! <= 50 ? Colors.green : Colors.red)),
+                                    Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                      children: [
+                                        ElevatedButton.icon(
+                                          // Change: Now calls the Map Picker instead of just GPS
+                                          onPressed: () => _pickLocationFromMap(context), 
+                                          icon: const Icon(Icons.map_rounded),
+                                          label: const Text("Select on Map"),
+                                        ),
+                                        ElevatedButton(onPressed: _testOfficeRange, child: Text("Test Geofence")),
+                                      ]
+                                    ),
                                   ],
                                 )
                               ),
@@ -968,6 +979,28 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
       }
     } catch (e) {
       _showSnackBar("Error refreshing status: $e", Colors.red);
+    }
+  }
+
+  void _testOfficeRange() async {
+    bool hasPermission = await LocationService.handleLocationPermission();
+    if (!hasPermission) return;
+
+    Position position = await Geolocator.getCurrentPosition();
+
+    setState(() {
+      currentDistance = LocationService.getDistance(
+        position.latitude, 
+        position.longitude, 
+        selectedLat!, 
+        selectedLng!
+      );
+    });
+
+    if (currentDistance! <= 50) {
+      _showSnackBar("Test Passed: You are in range!", Colors.green);
+    } else {
+      _showSnackBar("Test Failed: You are ${currentDistance!.toInt()}m away.", Colors.red);
     }
   }
 }
