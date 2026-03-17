@@ -66,7 +66,7 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(horizontal: 20),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -215,11 +215,11 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
         color: color ?? Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: primaryBlue, width: 2),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
             color: Colors.blueGrey,
             blurRadius: 10,
-            offset: const Offset(2, 4),
+            offset: Offset(2, 4),
           ),
         ],
       ),
@@ -233,7 +233,7 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
       color: Colors.white,
       child: Column(
         children: [
-          Text(
+          const Text(
             "Shift Details",
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
@@ -328,11 +328,11 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
           ),
           const Divider(color: Color(0xFF1A3E88)),
           const SizedBox(height: 10),
-          Row(
+          const Row(
             children: [
-              const Icon(Icons.event_busy, size: 50, color: Colors.grey),
-              const SizedBox(width: 10),
-              const Text("No shift assigned for this date.", style: TextStyle(color: Colors.grey, fontSize: 15)),
+              Icon(Icons.event_busy, size: 50, color: Colors.grey),
+              SizedBox(width: 10),
+              Text("No shift assigned for this date.", style: TextStyle(color: Colors.grey, fontSize: 15)),
             ],
           ),
           const Divider(height: 30),
@@ -528,7 +528,7 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
               border: Border.all(color: primaryBlue),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Text(value, textAlign: TextAlign.center, style: TextStyle(color: Colors.blueGrey, fontWeight: FontWeight.bold)),
+            child: Text(value, textAlign: TextAlign.center, style: const TextStyle(color: Colors.blueGrey, fontWeight: FontWeight.bold)),
           ),
         ],
       ),

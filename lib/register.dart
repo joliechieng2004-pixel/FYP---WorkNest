@@ -38,7 +38,7 @@ class _RegisterPageState extends State<RegisterPage> {
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(horizontal: 40),
+          padding: const EdgeInsets.symmetric(horizontal: 40),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -62,7 +62,7 @@ class _RegisterPageState extends State<RegisterPage> {
   TextButton RegisterLoginButton() {
     return TextButton(
       onPressed: goLogin,
-      child: Text(
+      child: const Text(
         'Back to Login',
         style: TextStyle(
           decoration: TextDecoration.underline, decorationThickness: 2
@@ -74,11 +74,11 @@ class _RegisterPageState extends State<RegisterPage> {
   ElevatedButton RegisterRegisterButton() {
     return ElevatedButton(
       style: ElevatedButton.styleFrom(
-        backgroundColor: Color.fromARGB(255, 40, 75, 158),
+        backgroundColor: const Color.fromARGB(255, 40, 75, 158),
         foregroundColor: Colors.white
       ),
       onPressed: _handleRegister,
-      child: Text(
+      child: const Text(
         "Register Account",
         style: TextStyle(
           fontSize: 20,
@@ -92,108 +92,108 @@ class _RegisterPageState extends State<RegisterPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("Department Name:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        const Text("Department Name:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
         TextFormField(
           controller: _deptNameController,
           decoration: InputDecoration(
             labelText: 'e.g. IT Department',
             enabledBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
               borderRadius: BorderRadius.circular(20)),
             focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
               borderRadius: BorderRadius.circular(20)
               )
           ),
         ),
-        SizedBox(height: 10),
-        Text("First Name:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 10),
+        const Text("First Name:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
         TextFormField(
           controller: _fNameController,
           decoration: InputDecoration(
             labelText: 'e.g. John (Given Name)',
             enabledBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
               borderRadius: BorderRadius.circular(20)),
             focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
               borderRadius: BorderRadius.circular(20)
               )
           ),
         ),
-        SizedBox(height: 10),
-        Text("Last Name:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 10),
+        const Text("Last Name:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
         TextFormField(
           controller: _lNameController,
           decoration: InputDecoration(
             labelText: 'e.g. Lim (Family Name)',
             enabledBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
               borderRadius: BorderRadius.circular(20)),
             focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
               borderRadius: BorderRadius.circular(20)
               )
           ),
         ),
-        SizedBox(height: 10),
-        Text("Contact Number:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 10),
+        const Text("Contact Number:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
         TextFormField(
           controller: _contactController,
           decoration: InputDecoration(
             labelText: 'e.g. 0123456789',
             enabledBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
               borderRadius: BorderRadius.circular(20)),
             focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
               borderRadius: BorderRadius.circular(20)
               )
           ),
         ),
-        SizedBox(height: 10),
-        Text("Email:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 10),
+        const Text("Email:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
         TextFormField(
           controller: _emailController,
           decoration: InputDecoration(
             labelText: 'e.g. example@mail.com',
             enabledBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
               borderRadius: BorderRadius.circular(20)),
             focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
               borderRadius: BorderRadius.circular(20)
               )
           ),
         ),
-        SizedBox(height: 10),
-        Text("Password:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 10),
+        const Text("Password:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
         TextFormField(
           controller: _passwordController,
           obscureText: true,
           decoration: InputDecoration(
             labelText: 'At least 8 characters',
             enabledBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
               borderRadius: BorderRadius.circular(20)),
             focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
               borderRadius: BorderRadius.circular(20)
               )
           ),
         ),
-        SizedBox(height: 10),
-        Text("Confirm Password:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 10),
+        const Text("Confirm Password:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
         TextFormField(
           controller: _confirmPasswordController,
           obscureText: true,
           decoration: InputDecoration(
             labelText: 'Re-enter your password',
             enabledBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
               borderRadius: BorderRadius.circular(20)),
             focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
               borderRadius: BorderRadius.circular(20)
             )
           ),

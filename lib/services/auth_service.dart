@@ -61,7 +61,14 @@ class AuthService {
           'managerID': result.user!.uid,
           'deptCode': newCode,
           'totalMembers': 1,
-          'attendanceLocation': officeLocation ?? const GeoPoint(0, 0), // Default to 0,0 for now
+          'attendanceSettings': {
+            'officeAddress': null,
+            'officeLocation': officeLocation ?? const GeoPoint(0, 0),
+            'radiusMeter': 100,
+            'requireFace': false,
+            'requireGPS': false,
+            'gracePeriod': 0,
+          },
           'createdAt': FieldValue.serverTimestamp(),
         });
         return null; 

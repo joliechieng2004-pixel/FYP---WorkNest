@@ -212,7 +212,7 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(color: Colors.grey.shade300),
-          boxShadow: isExpanded ? [BoxShadow(color: Colors.black12, blurRadius: 4)] : [],
+          boxShadow: isExpanded ? [const BoxShadow(color: Colors.black12, blurRadius: 4)] : [],
         ),
         child: Column(
           children: [
@@ -294,7 +294,7 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
 
   // --- STUBS FOR YOUR EXISTING WIDGETS ---
   Widget attendanceFilter() {
-    return Row(children: [const Icon(Icons.filter_list), const SizedBox(width: 5), const Text("Filter")]);
+    return const Row(children: [Icon(Icons.filter_list), SizedBox(width: 5), Text("Filter")]);
   }
 
   void addWorker(){

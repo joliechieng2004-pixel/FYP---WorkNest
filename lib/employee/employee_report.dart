@@ -50,7 +50,7 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(horizontal: 20),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -167,11 +167,11 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
         color: color ?? Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: primaryBlue, width: 2),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
             color: Colors.blueGrey,
             blurRadius: 10,
-            offset: const Offset(2, 4),
+            offset: Offset(2, 4),
           ),
         ],
       ),
@@ -194,7 +194,7 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
               border: Border.all(color: primaryBlue),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Text(value, textAlign: TextAlign.center, style: TextStyle(color: Colors.blueGrey, fontWeight: FontWeight.bold)),
+            child: Text(value, textAlign: TextAlign.center, style: const TextStyle(color: Colors.blueGrey, fontWeight: FontWeight.bold)),
           ),
         ],
       ),

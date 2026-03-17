@@ -111,7 +111,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
 
       if (deptDoc.exists) {
         Map<String, dynamic> data = deptDoc.data() as Map<String, dynamic>;
-        GeoPoint? geoPoint = data['officeLocation'];
+        GeoPoint? geoPoint = data['attendanceSettings.officeLocation'];
 
         setState(() {
           if (geoPoint != null) {
@@ -211,7 +211,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
   SafeArea _buildHomeDashboard(BuildContext context) {
     return SafeArea(
       child: SingleChildScrollView(
-        padding: EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
@@ -320,11 +320,11 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
 
             // 4. NEW: Upcoming Shift Preview
             _buildCard(
-              child: Column(
+              child: const Column(
                 children: [
-                  const Text("Next Shift", style: TextStyle(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 10),
-                  const ListTile(
+                  Text("Next Shift", style: TextStyle(fontWeight: FontWeight.bold)),
+                  SizedBox(height: 10),
+                  ListTile(
                     leading: Icon(Icons.event, color: Colors.blue),
                     title: Text("Monday, 9 March"),
                     subtitle: Text("09:00 AM - 05:00 PM"),
@@ -520,11 +520,11 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
         color: color ?? Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: primaryBlue, width: 2),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
             color: Colors.blueGrey,
             blurRadius: 10,
-            offset: const Offset(2, 4),
+            offset: Offset(2, 4),
           ),
         ],
       ),

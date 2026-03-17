@@ -2,14 +2,9 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import 'package:worknest/config.dart';
 import 'package:worknest/manager/manager_profile.dart';
 import 'package:worknest/manager/manager_report.dart';
 import 'package:worknest/manager/manager_schedule.dart';
-import 'package:worknest/services/auth_service.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:worknest/widget/face_verification.dart';
 import 'manager_employee.dart';
 
 class ManagerHome extends StatefulWidget {
@@ -20,15 +15,10 @@ class ManagerHome extends StatefulWidget {
 }
 
 class _ManagerHomePageState extends State<ManagerHome> {
-  bool _isClockedIn = false;
-  DateTime? _startTime;
-  String _workingHours = "00:00:00";
-  Timer? _timer;
   bool _isLoading = true;
 
   // for navigation
   int _selectedIndex = 0;
-  final AuthService _authService = AuthService();
   // often use colors
   final Color primaryBlue = const Color.fromARGB(255, 40, 75, 158);
   final Color bgLightBlue = const Color.fromARGB(255, 240, 250, 255);
@@ -36,17 +26,6 @@ class _ManagerHomePageState extends State<ManagerHome> {
   final ScrollController _activityScrollController = ScrollController();
   String deptCode = "Loading...";
   String lName = "Name";
-  String formattedDate = DateFormat('EEEE, d MMM yyyy').format(DateTime.now());
-  String formattedTime = DateFormat('h:mm a').format(DateTime.now());
-  
-  // Example: Coordinates for your office
-  // TODO: change to manager provided location
-  // TODO: let manager provide radius allowed
-  final double officeLat = 3.145686;
-  final double officeLng = 101.579963;
-  //final double officeLat = 37.421983;
-  //final double officeLng = -122.084049;
-  final double maxDistanceInMeters = 100.0; // The radius allowed (m)
 
   // ignore: unused_field
   int _totalEmployees = 0;
@@ -60,7 +39,6 @@ class _ManagerHomePageState extends State<ManagerHome> {
 
   void _initializeData() async {
     await _loadManagerData();
-    await _checkCurrentAttendanceStatus();
     await _loadEmployeeCount();
     setState(() {
       _isLoading = false;
@@ -69,7 +47,6 @@ class _ManagerHomePageState extends State<ManagerHome> {
 
   @override
   void dispose() {
-    _timer?.cancel();
     _activityScrollController.dispose(); // Clean up the controller
     super.dispose(); 
   }
@@ -87,37 +64,6 @@ class _ManagerHomePageState extends State<ManagerHome> {
         deptCode = userDoc['deptCode'];
         lName = userDoc['userLName'];
       });
-    }
-  }
-
-  Future<void>  _checkCurrentAttendanceStatus() async {
-    User? user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      // Reconstruct the same doc ID used in your clock-in logic
-      String dateId = DateFormat('yyyy-MM-dd').format(DateTime.now());
-      String docId = "${dateId}_${user.uid}";
-
-      DocumentSnapshot doc = await FirebaseFirestore.instance
-          .collection('attendances')
-          .doc(docId)
-          .get();
-
-      if (doc.exists) {
-        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-        
-        // If there is a start time but NO end time, they are still on shift
-        if (data['attendanceStartTime'] != null && data['attendanceEndTime'] == null) {
-          Timestamp startTimestamp = data['attendanceStartTime'];
-          DateTime startTime = startTimestamp.toDate();
-
-          setState(() {
-            _isClockedIn = true;
-            _startTime = startTime;
-          });
-
-          _startTimerTicker(); // Helper to start the actual timer
-        }
-      }
     }
   }
 
@@ -177,7 +123,7 @@ class _ManagerHomePageState extends State<ManagerHome> {
   SafeArea _buildHomeDashboard(BuildContext context) {
     return SafeArea(
       child: SingleChildScrollView(
-        padding: EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
@@ -210,9 +156,9 @@ class _ManagerHomePageState extends State<ManagerHome> {
               color: Colors.blue.shade50,
               child: Row(
                 children: [
-                  Expanded(
+                  const Expanded(
                     flex: 5,
-                    child: const Text(
+                    child: Text(
                       "Department Code:",
                       style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold))),
                   Expanded(
@@ -227,49 +173,6 @@ class _ManagerHomePageState extends State<ManagerHome> {
                     ),
                   ),
                 ],
-              ),
-            ),
-
-            // 2. Clock In Card
-            _buildCard(
-              child: Column(
-                children: [
-                  if (! _isClockedIn)...[
-                    Text(formattedDate, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                    Text(formattedTime, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 5),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF00C2A0), // Teal Green
-                        foregroundColor: Colors.black,
-                        minimumSize: const Size(250, 50),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                      ),
-                      onPressed: _clockIn,
-                      child: const Text("Clock In", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                    )
-                  ] else ...[
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(formattedDate, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                        Text(formattedTime, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                    Text(_workingHours, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, letterSpacing: 2, color: Color(0xFF00C2A0)),),
-                    const SizedBox(height: 5),
-                    ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFE53935 ), // Teal Green
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size(250, 50),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                      ),
-                      onPressed: _showClockOutConfirmation,
-                      child: const Text("Clock Out", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                    )
-                  ]
-                ]    
               ),
             ),
 
@@ -323,176 +226,6 @@ class _ManagerHomePageState extends State<ManagerHome> {
     );
   }
 
-  // --- CLOCK IN FUNCTION ---
-  void _clockIn() async {
-    User? user = FirebaseAuth.instance.currentUser;
-
-    bool canProceed = true;
-
-    if (user != null) {
-      try {
-        showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (context) => const Center(child: CircularProgressIndicator()));
-
-        //1. Get User's Current GPS Position
-        Position position = await _getCurrentLocation() ?? await Geolocator.getCurrentPosition();
-        
-        //2. Calculate Distance from Office
-        double distanceInMeters = Geolocator.distanceBetween(
-          position.latitude, 
-          position.longitude, 
-          officeLat, 
-          officeLng
-        );
-
-        //3. Check if user is within the allowed radius (e.g., 100m)
-        if (distanceInMeters <= maxDistanceInMeters) {
-          
-          // Success: User is at the office
-          GeoPoint currentGeoPoint = GeoPoint(position.latitude, position.longitude);
-
-          String? error = await _authService.clockInUser(
-            uid: user.uid,
-            deptCode: deptCode,
-            location: currentGeoPoint, // Pass this once you uncomment GPS logic
-          );
-
-          if (AppConfig.useFaceVerificationStub) {
-            // Wait for the stub screen to return 'true'
-            canProceed = await Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const FaceVerification()),
-            ) ?? false;
-          }
-
-          if (canProceed) {
-            // Run your existing successful Clock-In logic here
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text("Face Verification successful!"), backgroundColor: Colors.green)
-            );
-            _authService.clockInUser(uid: user.uid, deptCode: deptCode, location: currentGeoPoint);
-          }
-
-          Navigator.pop(context); // Close loading indicator
-
-          if (error == null) {
-            setState(() {
-              _isClockedIn = true;
-              _startTime = DateTime.now();
-            });
-
-            _startTimerTicker();
-
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text("Clock-in successful! You are on-site."), backgroundColor: Colors.green)
-            );
-          }
-        } else {
-          Navigator.pop(context);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Too far from office: ${distanceInMeters.toStringAsFixed(0)}m"), backgroundColor: Colors.red)
-          );
-        }
-      } catch (e) {
-        if (Navigator.canPop(context)) Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
-      }
-    }
-  }
-
-  // --- Clock Out ---
-  void _clockOutLogic() async {
-    User? user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    try {
-      // Show loading while talking to Firebase
-      showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => const Center(child: CircularProgressIndicator()));
-
-      // Call the new service function
-      String? error = await _authService.clockOutUser(uid: user.uid);
-
-      Navigator.pop(context); // Close loading
-
-      if (error == null) {
-        _timer?.cancel();
-        _timer = null;
-
-        setState(() {
-          _isClockedIn = false;
-          _workingHours = "00:00:00";
-          _startTime = null;
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Clock-out recorded in Firebase!"), backgroundColor: Colors.orange),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
-      }
-    } catch (e) {
-      if (Navigator.canPop(context)) Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
-    }
-  }
-
-  // This handles the UI pop-up
-  void _showClockOutConfirmation() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text("Confirm Clock Out", style: TextStyle(fontWeight:FontWeight(5)),),
-          content: const Text("Are you sure you want to end your shift?"),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Cancel", style: TextStyle(color: Colors.black),),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context); // Close dialog
-                _clockOutLogic();       // Run the reset logic
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black),
-              child: const Text("Confirm"),
-            ),
-          ],
-        );
-      },
-    );
-  }
-  
-
-  // --- LOCATION GETTER ---
-  Future<Position?> _getCurrentLocation() async {
-    bool serviceEnabled;
-    LocationPermission permission;
-
-    // 1. Check if location services are enabled
-    serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) return Future.error('Location services are disabled.');
-
-    // 2. Check/Request permissions
-    permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) return Future.error('Location permissions are denied');
-    }
-    
-    if (permission == LocationPermission.deniedForever) {
-      return Future.error('Location permissions are permanently denied.');
-    }
-
-    // 3. Get the current position
-    return await Geolocator.getCurrentPosition();
-  }
-
   // --- HELPERS ---
   // Helper for Cards
   Widget _buildCard({required Widget child, Color? color}) {
@@ -504,11 +237,11 @@ class _ManagerHomePageState extends State<ManagerHome> {
         color: color ?? Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: primaryBlue, width: 2),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
             color: Colors.blueGrey,
             blurRadius: 10,
-            offset: const Offset(2, 4),
+            offset: Offset(2, 4),
           ),
         ],
       ),
@@ -531,7 +264,7 @@ class _ManagerHomePageState extends State<ManagerHome> {
               border: Border.all(color: primaryBlue),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Text(value, textAlign: TextAlign.center, style: TextStyle(color: Colors.blueGrey, fontWeight: FontWeight.bold)),
+            child: Text(value, textAlign: TextAlign.center, style: const TextStyle(color: Colors.blueGrey, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -549,20 +282,6 @@ class _ManagerHomePageState extends State<ManagerHome> {
       ),
       child: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
     );
-  }
-
-  void _startTimerTicker() {
-    _timer?.cancel(); // Clear any existing timer
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_isClockedIn && _startTime != null) {
-        final duration = DateTime.now().difference(_startTime!);
-        setState(() {
-          _workingHours = duration.toString().split('.').first.padLeft(8, "0");
-        });
-      } else {
-        timer.cancel();
-      }
-    });
   }
 
   Future<void> _loadEmployeeCount() async {

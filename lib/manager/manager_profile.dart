@@ -46,8 +46,15 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
   double? selectedLat;
   double? selectedLng;
   String addressName = "Unknown Location";
-
   double? currentDistance;
+
+  // New settings state
+  bool requireGPS = true;
+  bool requireFace = true;
+  int gracePeriod = 15;
+  int radiusMeter = 0;
+  GeoPoint? officeLocation;
+  bool _isLoadingSettings = true;
 
   int _expandedIndex = 0;
 
@@ -56,6 +63,7 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
   void initState() {
     super.initState();
     docID = FirebaseAuth.instance.currentUser?.uid ?? ""; // Get ID first
+    _loadDeptSettings();
     _initializeData();
   }
 
@@ -87,6 +95,31 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
     super.dispose(); 
   }
 
+  Future<void> _loadDeptSettings() async {
+    try {
+      DocumentSnapshot doc = await FirebaseFirestore.instance
+          .collection('departments')
+          .doc(widget.deptCode) // RDQ3P2YF
+          .get();
+
+      if (doc.exists) {
+        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+        setState(() {
+          requireGPS = data['attendanceSettings.requireGPS'] ?? true;
+          requireFace = data['attendanceSettings.requireFace'] ?? true;
+          gracePeriod = data['attendanceSettings.gracePeriod'] ?? 15;
+          officeLocation = data['attendanceSettings.officeLocation'];
+          _isLoadingSettings = false;
+        });
+      } else {
+        // If no settings exist yet, initialize them
+        setState(() => _isLoadingSettings = false);
+      }
+    } catch (e) {
+      print("Error loading settings: $e");
+    }
+  }
+
   Future<void> _loadOfficeData() async {
     if (deptCode.isEmpty) {
       print("DEBUG: deptCode is empty. Waiting for user data...");
@@ -102,19 +135,23 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
 
         print("DEBUG: Found department: ${deptDoc.id}");
 
-        // 2. Extract the GeoPoint and Address
-        // Note: Firebase stores location as a 'GeoPoint' type
-        GeoPoint? geoPoint = data['officeLocation']; 
-        String? savedAddress = data['officeAddress'];
+        // 1. Get the nested map first
+        Map<String, dynamic>? attendanceSettings = data['attendanceSettings'] as Map<String, dynamic>?;
 
-        // 3. Update the UI state
-        setState(() {
-          if (geoPoint != null) {
-            selectedLat = geoPoint.latitude;
-            selectedLng = geoPoint.longitude;
-          }
-          addressName = savedAddress ?? "No address set";
-        });
+        // 2. Extract the values from that map
+        if (attendanceSettings != null) {
+          GeoPoint? geoPoint = attendanceSettings['officeLocation']; 
+          String? savedAddress = attendanceSettings['officeAddress'];
+
+          // 3. Update the UI state
+          setState(() {
+            if (geoPoint != null) {
+              selectedLat = geoPoint.latitude;
+              selectedLng = geoPoint.longitude;
+            }
+            addressName = savedAddress ?? "No address set";
+          });
+        }
       } else {
         print("DEBUG: No document found at departments/$deptCode");
         setState(() => addressName = "Department Not Found ($deptCode)");
@@ -178,7 +215,7 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(horizontal: 20),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -187,9 +224,9 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text("$fName $lName", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-                    Text("Department ID: $deptCode", style: TextStyle(fontSize: 15, color: Colors.blueGrey)),
-                    Text("Email: $email", style: TextStyle(fontSize: 15, color: Colors.blueGrey)),
+                    Text("$fName $lName", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                    Text("Department ID: $deptCode", style: const TextStyle(fontSize: 15, color: Colors.blueGrey)),
+                    Text("Email: $email", style: const TextStyle(fontSize: 15, color: Colors.blueGrey)),
                   ],
                 ),
               ),
@@ -212,7 +249,7 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                         children: [
                           Row(
                             children: [
-                              Flexible( // Use Flexible instead of Expanded here
+                              FittedBox( // Use Flexible instead of Expanded here
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
@@ -221,10 +258,10 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                                       controller: _profileFNameController,
                                       decoration: InputDecoration(
                                         enabledBorder: OutlineInputBorder(
-                                          borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                                          borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
                                           borderRadius: BorderRadius.circular(20)),
                                         focusedBorder: OutlineInputBorder(
-                                          borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                                          borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
                                           borderRadius: BorderRadius.circular(20)
                                         )
                                       )
@@ -242,10 +279,10 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                                       controller: _profileLNameController,
                                       decoration: InputDecoration(
                                         enabledBorder: OutlineInputBorder(
-                                          borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                                          borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
                                           borderRadius: BorderRadius.circular(20)),
                                         focusedBorder: OutlineInputBorder(
-                                          borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                                          borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
                                           borderRadius: BorderRadius.circular(20)
                                         )
                                       )
@@ -286,29 +323,29 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                             controller: _profileEmailController,
                             decoration: InputDecoration(
                               enabledBorder: OutlineInputBorder(
-                                borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
                                 borderRadius: BorderRadius.circular(20)),
                               focusedBorder: OutlineInputBorder(
-                                borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
                                 borderRadius: BorderRadius.circular(20)
                               )
                             ),
                           ),
-                          SizedBox(height: 10),
-                          Text("Contact Number:", style: TextStyle(fontSize: 18)),
+                          const SizedBox(height: 10),
+                          const Text("Contact Number:", style: TextStyle(fontSize: 18)),
                           TextFormField(
                             controller: _profileContactController,
                             decoration: InputDecoration(
                               enabledBorder: OutlineInputBorder(
-                                borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
                                 borderRadius: BorderRadius.circular(20)),
                               focusedBorder: OutlineInputBorder(
-                                borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
                                 borderRadius: BorderRadius.circular(20)
                               )
                             ),
                           ),
-                          SizedBox(height: 10),
+                          const SizedBox(height: 10),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceAround,
                             children: [
@@ -344,36 +381,36 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                       expandedChild: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text("New Password:", style: TextStyle(fontSize: 18)),
+                          const Text("New Password:", style: TextStyle(fontSize: 18)),
                           TextFormField(
                             controller: _newPasswordController,
                             obscureText: true,
                             decoration: InputDecoration(
                               enabledBorder: OutlineInputBorder(
-                                borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
                                 borderRadius: BorderRadius.circular(20)),
                               focusedBorder: OutlineInputBorder(
-                                borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
                                 borderRadius: BorderRadius.circular(20)
                               )
                             ),
                           ),
-                          SizedBox(height: 10),
-                          Text("Confirm Password:", style: TextStyle(fontSize: 18)),
+                          const SizedBox(height: 10),
+                          const Text("Confirm Password:", style: TextStyle(fontSize: 18)),
                           TextFormField(
                             controller: _confirmPasswordController,
                             obscureText: true,
                             decoration: InputDecoration(
                               enabledBorder: OutlineInputBorder(
-                                borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
                                 borderRadius: BorderRadius.circular(20)),
                               focusedBorder: OutlineInputBorder(
-                                borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
                                 borderRadius: BorderRadius.circular(20)
                               )
                             ),
                           ),
-                          SizedBox(height: 10),
+                          const SizedBox(height: 10),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceAround,
                             children: [
@@ -448,7 +485,7 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                                 child: const Text("Cancel")
                               ),
                               ElevatedButton(
-                                onPressed: _updateSettingsAndLocation, 
+                                onPressed: _saveNotification, 
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color.fromARGB(255, 40, 75, 158),
                                   foregroundColor: Colors.white,
@@ -475,20 +512,11 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                     const Divider(),
                     _buildExpandableSetting(
                       index: 4,
-                      title: "Attendance Settings",
-                      icon: Icons.timer_outlined,
+                      title: "Department Location",
+                      icon: Icons.work_outline_outlined,
                       expandedChild: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Office Location
-                          const Text(
-                            "Office Location",
-                            style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Color.fromARGB(255, 40, 75, 158)),
-                          ),
-                          const SizedBox(height: 10),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceAround,
                             children: [
@@ -506,19 +534,23 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                                       style: const TextStyle(fontSize: 16, color: Colors.black87),
                                     ),
                                     const SizedBox(height: 10),
-                                    if (currentDistance != null)
-                                      Text("Distance to Office: ${currentDistance!.toInt()}m", 
-                                        style: TextStyle(color: currentDistance! <= 50 ? Colors.green : Colors.red)),
+                                    ElevatedButton.icon(
+                                      onPressed: () => _pickLocationFromMap(context), 
+                                      icon: const Icon(Icons.map_rounded),
+                                      label: const Text("Select on Map"),
+                                    ),
                                     Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                      mainAxisAlignment: MainAxisAlignment.start,
                                       children: [
                                         ElevatedButton.icon(
-                                          // Change: Now calls the Map Picker instead of just GPS
-                                          onPressed: () => _pickLocationFromMap(context), 
-                                          icon: const Icon(Icons.map_rounded),
-                                          label: const Text("Select on Map"),
+                                          onPressed: () => _testOfficeRange(),
+                                          icon: const Icon(Icons.checklist_rounded),
+                                          label: const Text("Test Geofence"),
                                         ),
-                                        ElevatedButton(onPressed: _testOfficeRange, child: Text("Test Geofence")),
+                                        const SizedBox(width: 20),
+                                        if (currentDistance != null)
+                                          Text("Distance to Office: ${currentDistance!.toInt()}m", 
+                                            style: TextStyle(color: currentDistance! <= 50 ? Colors.green : Colors.red)),
                                       ]
                                     ),
                                   ],
@@ -526,28 +558,6 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                               ),
                             ],
                           ),
-
-                          // Location Verification
-                            const Text("Location Verification", 
-                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color.fromARGB(255, 40, 75, 158))),
-                            const SizedBox(height: 10),
-                            _buildSwitchOption("Require for clock in", notifyCheckIn, (val) => setState(() => notifyCheckIn = val)),
-                            _buildSwitchOption("Require for clock out", notifyLate, (val) => setState(() => notifyLate = val)),
-
-                          // Face Verification
-                            const Text("Face Verification", 
-                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color.fromARGB(255, 40, 75, 158))),
-                            const SizedBox(height: 10),
-                            _buildSwitchOption("Require for clock in", notifyCheckIn, (val) => setState(() => notifyCheckIn = val)),
-                            _buildSwitchOption("Require for clock out", notifyLate, (val) => setState(() => notifyLate = val)),
-
-                          // Grace Period
-                            const Text("Grace Period", 
-                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color.fromARGB(255, 40, 75, 158))),
-                            const SizedBox(height: 10),
-                            _buildSwitchOption("Notify on Check-in", notifyCheckIn, (val) => setState(() => notifyCheckIn = val)),
-                            _buildSwitchOption("Notify on Late", notifyLate, (val) => setState(() => notifyLate = val)),
-
                           const SizedBox(height: 20),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -563,7 +573,7 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                                 child: const Text("Cancel")
                               ),
                               ElevatedButton(
-                                onPressed: _updateSettingsAndLocation, 
+                                onPressed: _saveLocation, 
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: const Color.fromARGB(255, 40, 75, 158),
                                   foregroundColor: Colors.white,
@@ -577,6 +587,103 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                         ],
                       ),
                     ),
+                    _buildExpandableSetting(
+                      index: 5,
+                      title: "Attendance Settings",
+                      icon: Icons.event_available_outlined,
+                      expandedChild: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                        // Verification
+                          const Text("Verification Requirement", 
+                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color.fromARGB(255, 40, 75, 158))),
+                          const SizedBox(height: 10),
+                          _buildSwitchOption("Require GPS Verification", requireGPS, (val) => setState(() => requireGPS = val)),
+                          _buildSwitchOption("Require Face Verification", requireFace, (val) => setState(() => requireFace = val)),
+
+                        // Face Verification
+                          const Text("Attendance Settings", 
+                              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color.fromARGB(255, 40, 75, 158))),
+                          const SizedBox(height: 10),
+
+                        // Grace Period
+                          ListTile(
+                            title: const Text("Grace Period"),
+                            trailing: SizedBox(
+                              width: 100,
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<int>(
+                                  isExpanded: true,
+                                  value: gracePeriod,
+                                  icon: const Icon(Icons.arrow_drop_down_circle_outlined),
+                                  items: [0, 5, 10, 15, 30, 60].map((int value) {
+                                    return DropdownMenuItem<int>(
+                                      value: value,
+                                      child: Text("$value mins"),
+                                    );
+                                  }).toList(),
+                                  onChanged: (int? newValue) {
+                                    if (newValue != null) {
+                                      setState(() => gracePeriod = newValue);
+                                    }
+                                  },
+                                ),
+                              ),
+                            ),
+                          ),
+                          ListTile(
+                            title: const Text("Geofencing Radius"),
+                            trailing: SizedBox(
+                              width: 100,
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<int>(
+                                  isExpanded: true,
+                                  value: radiusMeter,
+                                  icon: const Icon(Icons.arrow_drop_down_circle_outlined),
+                                  items: [0, 50, 100, 150, 200].map((int value) {
+                                    return DropdownMenuItem<int>(
+                                      value: value,
+                                      child: Text("$value meters"),
+                                    );
+                                  }).toList(),
+                                  onChanged: (int? newValue) {
+                                    if (newValue != null) {
+                                      setState(() => radiusMeter = newValue);
+                                    }
+                                  },
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              ElevatedButton(
+                                onPressed: _cancelEdit,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color.fromARGB(255, 40, 75, 158),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
+                                ),
+                                child: const Text("Cancel")
+                              ),
+                              ElevatedButton(
+                                onPressed: _saveAttendanceSettings, 
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color.fromARGB(255, 40, 75, 158),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
+                                ),
+                                child: const Text("Save Settings")
+                              )
+                            ]
+                          )
+                        ],
+                      )
+                    )
                   ],
                 ),
               ),
@@ -592,7 +699,7 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                       FirebaseAuth.instance.signOut();
                       Navigator.pushReplacementNamed(context, '/login');
                     },
-                child: Text(
+                child: const Text(
                   "Log Out",
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
@@ -605,6 +712,8 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
     );
   }
 
+  // --- BUILD HELPER ---
+
   // Helper for Cards
   Widget _buildCard({required Widget child, Color? color}) {
     return Container(
@@ -615,11 +724,11 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
         color: color ?? Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: primaryBlue, width: 2),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
             color: Colors.blueGrey,
             blurRadius: 10,
-            offset: const Offset(2, 4),
+            offset: Offset(2, 4),
           ),
         ],
       ),
@@ -633,6 +742,7 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
     required String title,
     required IconData icon,
     required Widget expandedChild,
+    bool showDivider = true,
   }) {
     bool isExpanded = _expandedIndex == index;
 
@@ -654,197 +764,9 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
             padding: const EdgeInsets.only(bottom: 15, left: 10, right: 10),
             child: expandedChild,
           ),
-        if (index != 3) const Divider(height: 1), // Don't show divider for last item
+        if (showDivider) const Divider(height: 1), // Don't show divider for last item
       ],
     );
-  }
-
-  Future<void> _changeProfileConfirmation() async {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text("Save Changes", style: TextStyle(fontWeight:FontWeight(5)),),
-          content: const Text("Are you sure you want to save the changes made to your profile?"),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Cancel", style: TextStyle(color: Colors.black),),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context); // Close dialog
-                _updateProfile();       // Run the reset logic
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black),
-              child: const Text("Confirm"),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  // Function to update the profile in Firebase
-  Future<void> _updateProfile() async {
-    try {
-      User? user = FirebaseAuth.instance.currentUser;
-      String newEmail = _profileEmailController.text.trim();
-      String oldEmail = user?.email ?? "";
-
-      bool emailChanged = (user != null && newEmail != oldEmail);
-
-      // 1. Handle Auth Email Change if necessary
-      if (emailChanged) {
-        try {
-          await user!.verifyBeforeUpdateEmail(newEmail);
-          setState(() {
-            isWaitingForVerification = true; // Trigger the UI change
-          });
-          _showSnackBar("Verification email sent to $newEmail!", Colors.blue);
-        } on FirebaseAuthException catch (e) {
-          if (e.code == 'requires-recent-login') {
-            _showPasswordDialog(newEmail);
-            return; // EXIT: Don't update Firestore yet if re-auth is needed
-          } else {
-            _showSnackBar("Auth Error: ${e.message}", Colors.red);
-            return; // EXIT: Stop if there's another auth error
-          }
-        }
-      }
-
-      // 2. Update Firestore
-      // NOTICE: We only update the 'userEmail' field in Firestore 
-      // IF it didn't require a re-auth, OR we can choose to keep the old email 
-      // in Firestore until they actually verify.
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(docID)
-          .update({
-        'userFName': _profileFNameController.text.trim(),
-        'userLName': _profileLNameController.text.trim(),
-        'userContact': _profileContactController.text.trim(),
-        // Option: Only update this if you want Firestore to show the "pending" email
-        'userEmail': newEmail, 
-      });
-
-      _showSnackBar("Profile updated successfully!", Colors.green);
-      
-    } catch (e) {
-      print("Error: $e");
-    }
-  }
-
-  Future<void> _reauthenticateAndChangeEmail(String password, String newEmail) async {
-    try {
-      User? user = FirebaseAuth.instance.currentUser;
-      AuthCredential credential = EmailAuthProvider.credential(
-        email: user!.email!, 
-        password: password
-      );
-
-      // 1. Re-authenticate
-      await user.reauthenticateWithCredential(credential);
-
-      // 2. Trigger the Verification Email
-      await user.verifyBeforeUpdateEmail(newEmail);
-
-      setState(() {
-        isWaitingForVerification = true; // Trigger the UI change
-      });
-      
-      // 3. Update Firestore NOW so the UI reflects the "Pending" change
-      await FirebaseFirestore.instance.collection('users').doc(docID).update({
-        'userEmail': newEmail,
-        'emailVerified': false, // Add this field to track status
-      });
-
-      _showSnackBar("Success! Please check $newEmail to verify your account.", Colors.blue);
-    } catch (e) {
-      _showSnackBar("Error: ${e.toString()}", Colors.red);
-    }
-  }
-
-  Future<void> _showPasswordDialog(String newEmail) async {
-    final TextEditingController _passwordController = TextEditingController();
-
-    return showDialog(
-      context: context,
-      barrierDismissible: false, // User must interact with the dialog
-      builder: (context) {
-        return AlertDialog(
-          title: const Text("Confirm Password"),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text("Please enter your current password to authorize the email change."),
-              const SizedBox(height: 15),
-              TextField(
-                controller: _passwordController,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  labelText: "Password",
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Cancel"),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                String password = _passwordController.text.trim();
-                if (password.isNotEmpty) {
-                  Navigator.pop(context);
-                  _reauthenticateAndChangeEmail(password, newEmail);
-                }
-              },
-              child: const Text("Verify & Update"),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<void> _validateAndUpdatePassword() async {
-    String newPass = _newPasswordController.text.trim();
-    String confirmPass = _confirmPasswordController.text.trim();
-
-    if (newPass.isEmpty || confirmPass.isEmpty) {
-      _showSnackBar("Please fill in both fields", Colors.orange);
-      return;
-    }
-
-    if (newPass.length < 6) {
-      _showSnackBar("Password must be at least 6 characters", Colors.orange);
-      return;
-    }
-
-    if (newPass != confirmPass) {
-      _showSnackBar("Passwords do not match", Colors.red);
-      return;
-    }
-
-    try {
-      User? user = FirebaseAuth.instance.currentUser;
-      await user?.updatePassword(newPass);
-      
-      _showSnackBar("Password updated successfully!", Colors.green);
-      _newPasswordController.clear();
-      _confirmPasswordController.clear();
-      setState(() => _expandedIndex = 0);
-      
-    } on FirebaseAuthException catch (e) {
-      if (e.code == 'requires-recent-login') {
-        _showSnackBar("Please log out and log in again to update your password.", Colors.red);
-      } else {
-        _showSnackBar("Error: ${e.message}", Colors.red);
-      }
-    }
   }
 
   // Helper for showing messages
@@ -868,47 +790,9 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
     return SwitchListTile(
       title: Text(title),
       value: value,
-      activeColor: const Color.fromARGB(255, 40, 75, 158),
+      activeThumbColor: const Color.fromARGB(255, 40, 75, 158),
       onChanged: onChanged,
     );
-  }
-
-  Future<void> _updateSettingsAndLocation() async {
-    try {
-      // 1. Create a Write Batch to ensure both updates succeed or both fail
-      WriteBatch batch = _db.batch();
-
-      // 2. Reference for User Settings
-      DocumentReference userRef = _db.collection('users').doc(docID);
-      batch.update(userRef, {
-        'settings.notifyShift': notifyShift,
-        if (userRole == "manager") ...{
-          'settings.notifyCheckIn': notifyCheckIn,
-          'settings.notifyLate': notifyLate,
-          'settings.notifyAbsent': notifyAbsent,
-        }
-      });
-
-      // 3. Reference for Department Location (if user is a manager and location is set)
-      if (userRole == "manager" && selectedLat != null && selectedLng != null) {
-        // Ensure you have the departmentId variable available in your class
-        DocumentReference deptRef = _db.collection('departments').doc(deptCode);
-        
-        batch.update(deptRef, {
-          'officeLocation': GeoPoint(selectedLat!, selectedLng!),
-          'officeAddress': addressName,
-          'updatedAt': FieldValue.serverTimestamp(), // Good practice for FYP
-        });
-      }
-
-      // 4. Commit the batch
-      await batch.commit();
-
-      _showSnackBar("All settings and location updated!", Colors.green);
-      setState(() => _expandedIndex = 0); 
-    } catch (e) {
-      _showSnackBar("Update failed: $e", Colors.red);
-    }
   }
 
   void _cancelEdit() {
@@ -922,6 +806,253 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
       // 2. Collapse the card
       _expandedIndex = 0;
     });
+  }
+
+  // --- ACCOUNT SETTINGS ---
+  // Save Settings
+  Future<void> _saveProfile() async {
+    try {
+      User? user = FirebaseAuth.instance.currentUser;
+      String newEmail = _profileEmailController.text.trim();
+      String oldEmail = user?.email ?? "";
+      bool emailChanged = (user != null && newEmail != oldEmail);
+
+      // 1. If email changed, handle Auth verification
+      if (emailChanged) {
+        try {
+          await user.verifyBeforeUpdateEmail(newEmail);
+          setState(() => isWaitingForVerification = true);
+          _showSnackBar("Verification email sent to $newEmail!", Colors.blue);
+        } on FirebaseAuthException catch (e) {
+          if (e.code == 'requires-recent-login') {
+            _showPasswordDialog(newEmail); // Triggers re-auth flow
+            return; 
+          } else {
+            _showSnackBar("Auth Error: ${e.message}", Colors.red);
+            return;
+          }
+        }
+      }
+
+      // 2. Update Firestore for other fields
+      await FirebaseFirestore.instance.collection('users').doc(docID).update({
+        'userFName': _profileFNameController.text.trim(),
+        'userLName': _profileLNameController.text.trim(),
+        'userContact': _profileContactController.text.trim(),
+      });
+
+      _showSnackBar("Profile updated successfully!", Colors.green);
+      setState(() => _expandedIndex = -1); // Close card
+    } catch (e) {
+      _showSnackBar("Error: $e", Colors.red);
+    }
+  }
+
+  // Confirm before Change
+  Future<void> _changeProfileConfirmation() async {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Save Changes", style: TextStyle(fontWeight:FontWeight(5)),),
+          content: const Text("The profile information will be updated?"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel", style: TextStyle(color: Colors.black),),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context); // Close dialog
+                _saveProfile();       // Run the reset logic
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black),
+              child: const Text("Confirm"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // Email Verification Status
+  Future<void> _refreshVerificationStatus() async {
+    try {
+      User? user = FirebaseAuth.instance.currentUser;
+      
+      // This is the key command—it forces a fetch from Firebase Auth
+      await user?.reload(); 
+
+      if (user?.emailVerified ?? false) {
+        setState(() {
+          isWaitingForVerification = false; // Switch back to the green icon
+        });
+
+        _showSnackBar("Email verified successfully!", Colors.green);
+        
+        // Also update Firestore to keep the 'emailVerified' flag in sync
+        await FirebaseFirestore.instance.collection('users').doc(docID).update({
+          'emailVerified': true,
+        });
+      } else {
+        _showSnackBar("Email not verified yet. Please check your inbox.", Colors.orange);
+      }
+    } catch (e) {
+      _showSnackBar("Error refreshing status: $e", Colors.red);
+    }
+  }
+  
+  // Verify User Credential before Update New Email
+  Future<void> _showPasswordDialog(String newEmail) async {
+    final TextEditingController passwordController = TextEditingController();
+
+    return showDialog(
+      context: context,
+      barrierDismissible: false, // User must interact with the dialog
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Confirm Password"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text("Please enter your current password to authorize the email change."),
+              const SizedBox(height: 15),
+              TextField(
+                controller: passwordController,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: "Password",
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                String password = passwordController.text.trim();
+                if (password.isNotEmpty) {
+                  Navigator.pop(context);
+                  _reauthenticateAndChangeEmail(password, newEmail);
+                }
+              },
+              child: const Text("Verify & Update"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+  
+  // Authenticate New Email
+  Future<void> _reauthenticateAndChangeEmail(String password, String newEmail) async {
+    try {
+      User? user = FirebaseAuth.instance.currentUser;
+      AuthCredential credential = EmailAuthProvider.credential(
+        email: user!.email!, 
+        password: password
+      );
+
+      // Re-authenticate
+      await user.reauthenticateWithCredential(credential);
+      // Trigger the Verification Email
+      await user.verifyBeforeUpdateEmail(newEmail);
+
+      setState(() {
+        isWaitingForVerification = true; // Trigger the UI change
+      });
+      
+      // Update Firestore NOW so the UI reflects the "Pending" change
+      await FirebaseFirestore.instance.collection('users').doc(docID).update({
+        'userEmail': newEmail,
+        'emailVerified': false, // Add this field to track status
+      });
+      _showSnackBar("Success! Please check $newEmail to verify your account.", Colors.blue);
+    } catch (e) {
+      _showSnackBar("Error: ${e.toString()}", Colors.red);
+    }
+  }
+
+
+  // --- PASSWORD SETTINGS ---
+  // Validation and Update of Password
+  Future<void> _validateAndUpdatePassword() async {
+    String newPass = _newPasswordController.text.trim();
+    String confirmPass = _confirmPasswordController.text.trim();
+
+    if (newPass.isEmpty || confirmPass.isEmpty) {
+      _showSnackBar("Please fill in both fields", Colors.orange);
+      return;
+    }
+    if (newPass.length < 6) {
+      _showSnackBar("Password must be at least 6 characters", Colors.orange);
+      return;
+    }
+    if (newPass != confirmPass) {
+      _showSnackBar("Passwords do not match", Colors.red);
+      return;
+    }
+    try {
+      User? user = FirebaseAuth.instance.currentUser;
+      await user?.updatePassword(newPass);
+      
+      _showSnackBar("Password updated successfully!", Colors.green);
+      _newPasswordController.clear();
+      _confirmPasswordController.clear();
+      setState(() => _expandedIndex = 0);
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'requires-recent-login') {
+        _showSnackBar("Please log out and log in again to update your password.", Colors.red);
+      } else {
+        _showSnackBar("Error: ${e.message}", Colors.red);
+      }
+    }
+  }
+
+  // --- NOTIFICATION SETTINGS ---
+  Future<void> _saveNotification() async {
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(docID).update({
+        'settings.notifyShift': notifyShift, // Assuming this variable exists
+        if (userRole == "manager") ...{
+          'settings.notifyCheckIn': notifyCheckIn,
+          'settings.notifyLate': notifyLate,
+          'settings.notifyAbsent': notifyAbsent,
+        }
+      });
+      _showSnackBar("Notification preferences saved!", Colors.green);
+      setState(() => _expandedIndex = -1);
+    } catch (e) {
+      _showSnackBar("Failed to save notifications: $e", Colors.red);
+    }
+  }
+
+  // --- DEPARTMENT LOCATION ---
+  Future<void> _saveLocation() async {
+    if (selectedLat == null || selectedLng == null) {
+      _showSnackBar("Please pick a location on the map first", Colors.orange);
+      return;
+    }
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('departments')
+          .doc(deptCode)
+          .update({
+        'attendanceSettings.officeLocation': GeoPoint(selectedLat!, selectedLng!),
+        'attendanceSettings.officeAddress': addressName,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      _showSnackBar("Office location updated successfully!", Colors.green);
+      setState(() => _expandedIndex = -1);
+    } catch (e) {
+      _showSnackBar("Failed to save location: $e", Colors.red);
+    }
   }
 
   Future<void> _pickLocationFromMap(BuildContext context) async {
@@ -956,32 +1087,6 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
     }
   }
 
-  Future<void> _refreshVerificationStatus() async {
-    try {
-      User? user = FirebaseAuth.instance.currentUser;
-      
-      // This is the key command—it forces a fetch from Firebase Auth
-      await user?.reload(); 
-
-      if (user?.emailVerified ?? false) {
-        setState(() {
-          isWaitingForVerification = false; // Switch back to the green icon
-        });
-
-        _showSnackBar("Email verified successfully!", Colors.green);
-        
-        // Also update Firestore to keep the 'emailVerified' flag in sync
-        await FirebaseFirestore.instance.collection('users').doc(docID).update({
-          'emailVerified': true,
-        });
-      } else {
-        _showSnackBar("Email not verified yet. Please check your inbox.", Colors.orange);
-      }
-    } catch (e) {
-      _showSnackBar("Error refreshing status: $e", Colors.red);
-    }
-  }
-
   void _testOfficeRange() async {
     bool hasPermission = await LocationService.handleLocationPermission();
     if (!hasPermission) return;
@@ -997,10 +1102,40 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
       );
     });
 
+    // Start a 3-second countdown to hide the text
+    Future.delayed(const Duration(seconds: 5), () {
+      if (mounted) { // Safety check to ensure page is still open
+        setState(() {
+          currentDistance = null; // This makes the 'if' condition false
+        });
+      }
+    });
+
     if (currentDistance! <= 50) {
       _showSnackBar("Test Passed: You are in range!", Colors.green);
     } else {
       _showSnackBar("Test Failed: You are ${currentDistance!.toInt()}m away.", Colors.red);
+    }
+  }
+
+  // --- ATTENDANCE SETTINGS ---
+  Future<void> _saveAttendanceSettings() async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('departments')
+          .doc(widget.deptCode)
+          .update({
+        'attendanceSettings.requireGPS': requireGPS,
+        'attendanceSettings.requireFace': requireFace,
+        'attendanceSettings.gracePeriod': gracePeriod,
+        'attendanceSettings.radiusMeter': radiusMeter,
+        'lastUpdated': FieldValue.serverTimestamp(),
+      });
+
+      _showSnackBar("Attendance rules updated!", Colors.green);
+      setState(() => _expandedIndex = -1);
+    } catch (e) {
+      _showSnackBar("Failed to save settings: $e", Colors.red);
     }
   }
 }

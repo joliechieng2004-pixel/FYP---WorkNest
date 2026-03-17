@@ -30,23 +30,23 @@ class _LoginPageState extends State<LoginPage> {
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(horizontal: 40),
+          padding: const EdgeInsets.symmetric(horizontal: 40),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               LoginLogo(),
-              SizedBox(height: 20),
-              Text("LOGIN PAGE", style: TextStyle(fontSize: 30, fontWeight:FontWeight.bold, fontFamily: "Roboto-Bold", color: Color.fromARGB(255, 40, 75, 158)),),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
+              const Text("LOGIN PAGE", style: TextStyle(fontSize: 30, fontWeight:FontWeight.bold, fontFamily: "Roboto-Bold", color: Color.fromARGB(255, 40, 75, 158)),),
+              const SizedBox(height: 20),
               Column(
                 children: [
                   LoginRadioButton(),
-                  SizedBox(height: 10),
+                  const SizedBox(height: 10),
                   LoginForm(),
                 ],
               ),
-              SizedBox(height: 30),
+              const SizedBox(height: 30),
               LoginLoginButton(),
               LoginRegisterButton(),
             ]
@@ -59,7 +59,7 @@ class _LoginPageState extends State<LoginPage> {
   TextButton LoginRegisterButton() {
     return TextButton(
       onPressed: goRegister,
-      child: Text(
+      child: const Text(
         'Register New Account',
         style: TextStyle(
           decoration: TextDecoration.underline, decorationThickness: 2
@@ -71,11 +71,11 @@ class _LoginPageState extends State<LoginPage> {
   ElevatedButton LoginLoginButton() {
     return ElevatedButton(
       style: ElevatedButton.styleFrom(
-        backgroundColor: Color.fromARGB(255, 40, 75, 158),
+        backgroundColor: const Color.fromARGB(255, 40, 75, 158),
         foregroundColor: Colors.white
       ),
       onPressed: _handleLogin,
-      child: Text(
+      child: const Text(
         "Login",
         style: TextStyle(
           fontSize: 20,
@@ -89,47 +89,47 @@ class _LoginPageState extends State<LoginPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text("Department Code:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        const Text("Department Code:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
         TextFormField(
           controller: _deptCodeController,
           decoration: InputDecoration(
             labelText: 'e.g. T001',
             enabledBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
               borderRadius: BorderRadius.circular(20)),
             focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
               borderRadius: BorderRadius.circular(20)
               ),
           ),
         ),
-        SizedBox(height: 10),
-        Text("Email:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 10),
+        const Text("Email:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
         TextFormField(
           controller: _emailController,
           decoration: InputDecoration(
             labelText: 'e.g. example@mail.com',
             enabledBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
               borderRadius: BorderRadius.circular(20)),
             focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
               borderRadius: BorderRadius.circular(20)
               ),
           ),
         ),
-        SizedBox(height: 10),
-        Text("Password:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 10),
+        const Text("Password:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
         TextFormField(
           controller: _passwordController,
           obscureText: true,
           decoration: InputDecoration(
             labelText: 'At least 8 characters',
             enabledBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
               borderRadius: BorderRadius.circular(20)),
             focusedBorder: OutlineInputBorder(
-              borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
               borderRadius: BorderRadius.circular(20)
               )
           ),

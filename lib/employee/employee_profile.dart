@@ -117,7 +117,7 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(horizontal: 20),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -126,9 +126,9 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text("$fName $lName", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
-                    Text("Department ID: $deptCode", style: TextStyle(fontSize: 15, color: Colors.blueGrey)),
-                    Text("Email: $email", style: TextStyle(fontSize: 15, color: Colors.blueGrey)),
+                    Text("$fName $lName", style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                    Text("Department ID: $deptCode", style: const TextStyle(fontSize: 15, color: Colors.blueGrey)),
+                    Text("Email: $email", style: const TextStyle(fontSize: 15, color: Colors.blueGrey)),
                   ],
                 ),
               ),
@@ -160,10 +160,10 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
                                       controller: _profileFNameController,
                                       decoration: InputDecoration(
                                         enabledBorder: OutlineInputBorder(
-                                          borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                                          borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
                                           borderRadius: BorderRadius.circular(20)),
                                         focusedBorder: OutlineInputBorder(
-                                          borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                                          borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
                                           borderRadius: BorderRadius.circular(20)
                                         )
                                       )
@@ -181,10 +181,10 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
                                       controller: _profileLNameController,
                                       decoration: InputDecoration(
                                         enabledBorder: OutlineInputBorder(
-                                          borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                                          borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
                                           borderRadius: BorderRadius.circular(20)),
                                         focusedBorder: OutlineInputBorder(
-                                          borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                                          borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
                                           borderRadius: BorderRadius.circular(20)
                                         )
                                       )
@@ -194,35 +194,35 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
                               ),
                             ],
                           ),
-                          SizedBox(height: 10),
-                          Text("Email:", style: TextStyle(fontSize: 18)),
+                          const SizedBox(height: 10),
+                          const Text("Email:", style: TextStyle(fontSize: 18)),
                           TextFormField(
                             controller: _profileEmailController,
                             decoration: InputDecoration(
                               enabledBorder: OutlineInputBorder(
-                                borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
                                 borderRadius: BorderRadius.circular(20)),
                               focusedBorder: OutlineInputBorder(
-                                borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
                                 borderRadius: BorderRadius.circular(20)
                               )
                             ),
                           ),
-                          SizedBox(height: 10),
-                          Text("Contact Number:", style: TextStyle(fontSize: 18)),
+                          const SizedBox(height: 10),
+                          const Text("Contact Number:", style: TextStyle(fontSize: 18)),
                           TextFormField(
                             controller: _profileContactController,
                             decoration: InputDecoration(
                               enabledBorder: OutlineInputBorder(
-                                borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
                                 borderRadius: BorderRadius.circular(20)),
                               focusedBorder: OutlineInputBorder(
-                                borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
                                 borderRadius: BorderRadius.circular(20)
                               )
                             ),
                           ),
-                          SizedBox(height: 10),
+                          const SizedBox(height: 10),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceAround,
                             children: [
@@ -258,36 +258,36 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
                       expandedChild: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text("New Password:", style: TextStyle(fontSize: 18)),
+                          const Text("New Password:", style: TextStyle(fontSize: 18)),
                           TextFormField(
                             controller: _newPasswordController,
                             obscureText: true,
                             decoration: InputDecoration(
                               enabledBorder: OutlineInputBorder(
-                                borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
                                 borderRadius: BorderRadius.circular(20)),
                               focusedBorder: OutlineInputBorder(
-                                borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
                                 borderRadius: BorderRadius.circular(20)
                               )
                             ),
                           ),
-                          SizedBox(height: 10),
-                          Text("Confirm Password:", style: TextStyle(fontSize: 18)),
+                          const SizedBox(height: 10),
+                          const Text("Confirm Password:", style: TextStyle(fontSize: 18)),
                           TextFormField(
                             controller: _confirmPasswordController,
                             obscureText: true,
                             decoration: InputDecoration(
                               enabledBorder: OutlineInputBorder(
-                                borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
                                 borderRadius: BorderRadius.circular(20)),
                               focusedBorder: OutlineInputBorder(
-                                borderSide: BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
                                 borderRadius: BorderRadius.circular(20)
                               )
                             ),
                           ),
-                          SizedBox(height: 10),
+                          const SizedBox(height: 10),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceAround,
                             children: [
@@ -391,7 +391,7 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
                       FirebaseAuth.instance.signOut();
                       Navigator.pushReplacementNamed(context, '/login');
                     },
-                child: Text(
+                child: const Text(
                   "Log Out",
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
@@ -414,11 +414,11 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
         color: color ?? Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: primaryBlue, width: 2),
-        boxShadow: [
+        boxShadow: const [
           BoxShadow(
             color: Colors.blueGrey,
             blurRadius: 10,
-            offset: const Offset(2, 4),
+            offset: Offset(2, 4),
           ),
         ],
       ),
@@ -577,7 +577,7 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
     return SwitchListTile(
       title: Text(title),
       value: value,
-      activeColor: const Color.fromARGB(255, 40, 75, 158),
+      activeThumbColor: const Color.fromARGB(255, 40, 75, 158),
       onChanged: onChanged,
     );
   }

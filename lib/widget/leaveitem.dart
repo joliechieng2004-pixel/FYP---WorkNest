@@ -23,7 +23,7 @@ class _ExpandableLeaveItemState extends State<ExpandableLeaveItem> {
         color: Colors.white,
         border: Border.all(color: Colors.grey.shade300),
         borderRadius: BorderRadius.circular(12),
-        boxShadow: _isExpanded ? [BoxShadow(color: Colors.black12, blurRadius: 5)] : [],
+        boxShadow: _isExpanded ? [const BoxShadow(color: Colors.black12, blurRadius: 5)] : [],
       ),
       child: Column(
         children: [
