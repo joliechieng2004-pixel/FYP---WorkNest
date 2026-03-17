@@ -39,6 +39,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
 
   double officeLat = 0.0;
   double officeLng = 0.0;
+  double officeRadius = 0.0;
   String deptCode = "Loading...";
   String lName = "Name";
   String workerID = "Worker ID";
@@ -111,15 +112,22 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
 
       if (deptDoc.exists) {
         Map<String, dynamic> data = deptDoc.data() as Map<String, dynamic>;
-        GeoPoint? geoPoint = data['attendanceSettings.officeLocation'];
+        var settings = data['attendanceSettings'] as Map<String, dynamic>?;
+        
+        if (settings != null) {
+          GeoPoint? geoPoint = settings['officeLocation'];
+          // Use a default radius if the value is missing or null
+          double radiusMeter = (settings['radiusMeter'] ?? 100.0).toDouble();
 
-        setState(() {
-          if (geoPoint != null) {
-            // These are the variables your Clock-In logic uses
-            officeLat = geoPoint.latitude; 
-            officeLng = geoPoint.longitude;
-          }
-        });
+          setState(() {
+            if (geoPoint != null) {
+              // These are the variables your Clock-In logic uses
+              officeLat = geoPoint.latitude; 
+              officeLng = geoPoint.longitude;
+              officeRadius = radiusMeter;
+            }
+          });
+        }
         print("DEBUG: Office coordinates loaded for $code");
       }
     } catch (e) {
@@ -341,79 +349,133 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
   // --- CLOCK IN FUNCTION ---
   void _clockIn() async {
     User? user = FirebaseAuth.instance.currentUser;
-
-    bool faceVerified = true;
-
-    if (user != null) {
+    
+    if (user != null){
       try {
         showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (context) => const Center(child: CircularProgressIndicator()));
+          context: context,
+          barrierDismissible:false,
+          builder: (context) => const Center(child: CircularProgressIndicator()));
 
-        // Use our LocationService to handle permissions and get position
+        // --- CHECK LOCATION ---
+        // Handle permissions and get position
         bool hasPermission = await LocationService.handleLocationPermission();
+
         if (!hasPermission) {
           Navigator.pop(context);
           _showSnackBar("Location permissions denied.", Colors.red);
           return;
         }
-        //1. Get User's Current GPS Position
+
+         //1. Get User's Current GPS Position
         Position position = await _getCurrentLocation() ?? await Geolocator.getCurrentPosition();
-        
         //2. Calculate Distance from Office
         double distanceInMeters = LocationService.getDistance(
-          position.latitude, 
-          position.longitude, 
-          officeLat, 
+          position.latitude,
+          position.longitude,
+          officeLat,
           officeLng
         );
 
-        //3. Check if user is within the allowed radius (e.g., 100m)
-        if (distanceInMeters <= maxDistanceInMeters) {
-          // TODO: Placeholder for face verification
-          if (AppConfig.useFaceVerificationStub) {
-            // Wait for the stub screen to return 'true'
-            faceVerified = await Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const FaceVerification()),
-            ) ?? false;
-          }
-
-          if (faceVerified) {
-            // Success: User is at the office
-            GeoPoint currentGeoPoint = GeoPoint(position.latitude, position.longitude);
-
-            String? error = await _authService.clockInUser(
-              uid: user.uid,
-              deptCode: deptCode,
-              location: currentGeoPoint, // Pass this once you uncomment GPS logic
-            );
-
-            if (error == null) {
-              setState(() {
-                _isClockedIn = true;
-                _startTime = DateTime.now();
-              });
-
-              _startTimerTicker();
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text("Clock-in successful! You are on-site."), backgroundColor: Colors.green)
-              );
-            }
-          }
-
-          Navigator.pop(context); // Close loading indicator
-        } else {
-          // Failed: Too Far from Office
+        // Outside of office radius
+        // If not activated, the location is verified successfully
+        if (distanceInMeters > officeRadius){
           Navigator.pop(context);
           _showSnackBar("Too far: ${distanceInMeters.toInt()}m away.", Colors.red);
           return;
         }
+        
+         // --- CHECK SHIFT ---
+
+        String todayDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
+
+        QuerySnapshot shiftQuery = await FirebaseFirestore.instance
+
+            .collection('shifts')
+
+            .where('shiftUserID', isEqualTo: user.uid) // Use your actual field name from Firestore
+
+            .where('shiftDate', isEqualTo: todayDate)
+
+            .limit(1)
+
+            .get();
+
+
+
+        DocumentSnapshot? assignedShift = shiftQuery.docs.isNotEmpty ? shiftQuery.docs.first : null;
+
+
+
+        // Close loading before showing potential Dialog
+
+        Navigator.pop(context);
+
+
+
+        if (assignedShift == null) {
+
+          bool insist = await _showNoShiftDialog();
+
+          if (!insist) return; // Exit if they click "Cancel"
+
+        }
+
+
+
+        // --- FACE (OPTIONAL) ---
+
+        bool faceVerified = true;
+
+        // Face verification screen placeholder
+
+        if (AppConfig.useFaceVerificationStub) {
+
+          // Wait for the stub screen to return 'true'
+
+          faceVerified = await Navigator.push(
+
+            context,
+
+            MaterialPageRoute(builder: (context) => const FaceVerification()),
+
+          ) ?? false;
+
+        }
+
+        if (faceVerified) { // Face success (fake)
+          // Re-open Loading Spinner for the database write
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => const Center(child: CircularProgressIndicator()),
+          );
+
+          // ready to send location to the attendance log
+          GeoPoint currentGeoPoint = GeoPoint(position.latitude, position.longitude);
+
+          String? error = await _authService.clockInUser(
+            uid: user.uid,
+            deptCode: deptCode,
+            location: currentGeoPoint,
+            assignedShift: assignedShift,
+          );
+
+          Navigator.pop(context);
+
+          if (error == null) {
+            setState(() {
+              _isClockedIn = true;
+              _startTime = DateTime.now();
+            });
+            _startTimerTicker();
+
+            _showSnackBar("Clock-in successful", Colors.green);
+          } else {_showSnackBar("Clock-in failed: $error", Colors.red);}
+        }
       } catch (e) {
         if (Navigator.canPop(context)) Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
+        _showSnackBar("System Error: $e", Colors.red);
       }
     }
   }
@@ -575,5 +637,20 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), backgroundColor: color),
     );
+  }
+
+  // Helper for the "Insist" Dialog
+  Future<bool> _showNoShiftDialog() async {
+    return await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("No Shift Scheduled"),
+        content: const Text("You aren't scheduled for today. Do you still insist to clock in as 'Unscheduled'?"),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text("Clock In anyway")),
+        ],
+      ),
+    ) ?? false;
   }
 }

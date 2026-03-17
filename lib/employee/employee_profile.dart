@@ -541,19 +541,79 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
     try {
       User? user = FirebaseAuth.instance.currentUser;
       await user?.updatePassword(newPass);
-      
-      _showSnackBar("Password updated successfully!", Colors.green);
-      _newPasswordController.clear();
-      _confirmPasswordController.clear();
-      setState(() => _expandedIndex = 0);
-      
+      _onSuccessUpdate();
     } on FirebaseAuthException catch (e) {
       if (e.code == 'requires-recent-login') {
-        _showSnackBar("Please log out and log in again to update your password.", Colors.red);
+        // 1. Show the dialog to get the current password
+        String? currentPassword = await _showReAuthDialog();
+
+        if (currentPassword != null && currentPassword.isNotEmpty) {
+          try {
+            // 2. Create the credential
+            AuthCredential credential = EmailAuthProvider.credential(
+              email: email,
+              password: currentPassword,
+            );
+
+            // 3. Re-authenticate
+            await FirebaseAuth.instance.currentUser?.reauthenticateWithCredential(credential);
+
+            // 4. Retry the update now that the session is fresh
+            await FirebaseAuth.instance.currentUser?.updatePassword(newPass);
+            _onSuccessUpdate();
+            
+          } catch (reAuthError) {
+            _showSnackBar("Re-authentication failed. Please check your password.", Colors.red);
+          }
+        }
       } else {
         _showSnackBar("Error: ${e.message}", Colors.red);
       }
     }
+  }
+
+  Future<String?> _showReAuthDialog() async {
+    TextEditingController passwordController = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("Re-authenticate"),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text("For security, please enter your CURRENT password to continue."),
+            const SizedBox(height: 15),
+            TextField(
+              controller: passwordController,
+              obscureText: true,
+              decoration: InputDecoration(
+                hintText: "Current Password",
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(20)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, null),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, passwordController.text.trim()),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color.fromARGB(255, 40, 75, 158)),
+            child: const Text("Verify", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Helper to clean up after successful update
+  void _onSuccessUpdate() {
+    _showSnackBar("Password updated successfully!", Colors.green);
+    _newPasswordController.clear();
+    _confirmPasswordController.clear();
+    setState(() => _expandedIndex = 0);
   }
 
   // Helper for showing messages

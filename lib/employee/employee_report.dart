@@ -13,22 +13,19 @@ class EmployeeReport extends StatefulWidget {
 }
 
 class _EmployeeReportPageState extends State<EmployeeReport> {
-  late Stream<QuerySnapshot> _attendanceStream;
   // often use colors
   final Color primaryBlue = const Color.fromARGB(255, 40, 75, 158);
   final Color bgLightBlue = const Color.fromARGB(255, 240, 250, 255);
   
   final ScrollController _timesheetScrollController = ScrollController();
+  Stream<QuerySnapshot>? _attendanceStream;
 
   // --- INITIALIZATION ---
   @override
   void initState() {
     super.initState();
-    _attendanceStream = FirebaseFirestore.instance
-        .collection('attendances')
-        .where('attendanceUserID', isEqualTo: widget.workerID)
-        .orderBy('attendanceDate', descending: true)
-        .snapshots();
+    debugPrint(widget.workerID);
+    _initAttendanceStream();
   }
 
   @override
@@ -116,16 +113,24 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
                                 itemBuilder: (context, index) {
                                   var data = docs[index].data() as Map<String, dynamic>;
 
-                                  // 1. Convert Timestamps
-                                  DateTime? start = (data['attendanceStartTime'] as Timestamp?)?.toDate();
-                                  DateTime? end = (data['attendanceEndTime'] as Timestamp?)?.toDate();
-                                  DateTime? date = (data['attendanceDate'] as Timestamp?)?.toDate();
+                                  DateTime? safeConvertToDateTime(dynamic value) {
+                                    if (value == null) return null;
+                                    if (value is Timestamp) return value.toDate();
+                                    if (value is String) return DateTime.tryParse(value);
+                                    return null;
+                                  }
+
+                                  // 1. Convert safely using the helper
+                                  DateTime? start = safeConvertToDateTime(data['attendanceStartTime']);
+                                  DateTime? end = safeConvertToDateTime(data['attendanceEndTime']);
+                                  DateTime? date = safeConvertToDateTime(data['attendanceDate']);
 
                                   // 2. Format Strings
                                   String formattedDate = date != null ? DateFormat('dd MMM').format(date) : "--";
                                   String formattedIn = start != null ? DateFormat('hh:mm a').format(start) : "--:--";
                                   String formattedOut = end != null ? DateFormat('hh:mm a').format(end) : "--:--";
-                                  String status = data['attendanceStatus'] ?? "Pending";
+                                  String status = data['attendanceStatus'] ?? "Unscheduled";
+                                  String approval = data['attendanceApproval'] ?? "Pending";
 
                                   // 3. Calculate Duration
                                   String duration = "--";
@@ -140,6 +145,7 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
                                     clockOut: formattedOut,
                                     duration: duration,
                                     status: status,
+                                    approval: approval,
                                   );
                                 },
                               );
@@ -206,12 +212,17 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
     required String clockIn,
     required String clockOut,
     required String duration,
+    required String approval,
     required String status,
   }) {
     // Define color based on status
-    Color statusColor = status == "Approved" 
+    Color statusColor = status == "On Time" 
         ? Colors.green 
-        : status == "Rejected" ? Colors.red : Colors.orange;
+        : status == "Late" ? Colors.red : Colors.orange;
+    
+    Color approvalColor = approval == "Approved" 
+        ? Colors.green 
+        : approval == "Rejected" ? Colors.red : Colors.orange;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
@@ -223,7 +234,7 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(date, style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(date, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
                 Text(status, style: TextStyle(color: statusColor, fontSize: 12, fontWeight: FontWeight.w600)),
               ],
             ),
@@ -234,22 +245,41 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text("In: $clockIn", style: const TextStyle(fontSize: 13)),
-                Text("Out: $clockOut", style: const TextStyle(fontSize: 13)),
+                Text("In: $clockIn", style: const TextStyle(fontSize: 15)),
+                Text("Out: $clockOut", style: const TextStyle(fontSize: 15)),
               ],
             ),
           ),
           // Duration Info
           Expanded(
             flex: 2,
-            child: Text(
-              duration,
-              textAlign: TextAlign.right,
-              style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey),
+            child: Column(
+              children: [
+                Text(
+                  duration,
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey),
+                ),
+                Text(
+                  approval,
+                  textAlign: TextAlign.right,
+                  style: TextStyle(fontWeight: FontWeight.bold, color: approvalColor),
+                ),
+              ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  void _initAttendanceStream() {
+    // We initialize the stream ONCE here.
+    // This prevents the flickering issue.
+    _attendanceStream = FirebaseFirestore.instance
+        .collection('attendances')
+        .where('attendanceUserId', isEqualTo: widget.workerID)
+        .orderBy('attendanceDate', descending: true)
+        .snapshots();
   }
 }

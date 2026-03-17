@@ -212,37 +212,56 @@ class AuthService {
     required String uid,
     required String deptCode,
     required GeoPoint location,
+    DocumentSnapshot? assignedShift,
   }) async {
     try {
-      // Fetch User Name
+      // 1. Check User Profile FIRST (Fail fast)
       DocumentSnapshot userDoc = await _db.collection('users').doc(uid).get();
       if (!userDoc.exists) return "User profile not found.";
       
       Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
       String fullName = "${userData['userFName']} ${userData['userLName']}";
 
-      // 1. Create a unique ID for the day (e.g., 2026-02-27_UserID)
-      String dateId = DateFormat('yyyy-MM-dd').format(DateTime.now());
-      String docId = "${dateId}_$uid";
+      String todayDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      String status = "Unscheduled";
+      String? shiftID;
 
-      // 2. Reference the document
-      DocumentReference docRef = _db.collection('attendances').doc(docId);
+      // 2. Fetch gracePeriod
+      DocumentSnapshot deptDoc = await _db.collection('departments').doc(deptCode).get();
+      int gracePeriod = deptDoc.exists ? (deptDoc['gracePeriod'] ?? 0) : 0;
 
-      // 3. Set the data matching your fields
-      await docRef.set({
-        'attendanceDate': DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day), // Midnight of today
-        'attendanceStartTime': FieldValue.serverTimestamp(),
-        'attendanceEndTime': null, // Empty until they clock out
-        'attendanceLocation': location, // Placeholder for now
-        'attendanceStatus': "Pending",
-        'attendanceUserID': uid,
+      // 3. Status Logic
+      if (assignedShift != null && assignedShift.exists) {
+        shiftID = assignedShift.id;
+        
+        // Use the server time for the most accurate calculation if possible, 
+        // but DateTime.now() is fine for a BIT project.
+        DateTime now = DateTime.now();
+        
+        // Ensure startTime is a Timestamp in Firestore
+        DateTime scheduledStart = (assignedShift['startTime'] as Timestamp).toDate();
+        DateTime deadline = scheduledStart.add(Duration(minutes: gracePeriod));
+
+        status = now.isAfter(deadline) ? "Late" : "On Time";
+      }
+
+      // 4. Atomic Write
+      await _db.collection('attendances').doc("${todayDate}_$uid").set({
+        'attendanceUserId': uid,
         'attendanceUserName': fullName,
-        'deptCode': deptCode, // Crucial for Manager filtering
+        'deptCode': deptCode,
+        'attendanceLocation': location,
+        'attendanceDate': todayDate,
+        'attendanceStartTime': FieldValue.serverTimestamp(),
+        'attendanceEndTime': null,
+        'attendanceStatus': status,
+        'shiftID': shiftID,
+        'attendanceApproval': "Pending",
       });
-      
-      return null; // Success
+
+      return null;
     } catch (e) {
-      return e.toString();
+      return "System Error: ${e.toString()}";
     }
   }
 

@@ -18,8 +18,6 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
   // often use colors
   final Color primaryBlue = const Color.fromARGB(255, 40, 75, 158);
   final Color bgLightBlue = const Color.fromARGB(255, 240, 250, 255);
-  
-  late Stream<QuerySnapshot> _shiftStream;
 
   // Calendar
   CalendarFormat _calendarFormat = CalendarFormat.month;
@@ -32,18 +30,16 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
   String deptCode = "Loading...";
   String formattedDate = DateFormat('EEEE, d MMM yyyy').format(DateTime.now());
   String formattedTime = DateFormat('h:mm a').format(DateTime.now());
+  Stream<QuerySnapshot>? _shiftStream;
 
   // --- INITIALIZATION ---
   @override
   void initState() {
     super.initState();
     _selectedDay = DateTime.now(); // Default selection to today
+    _focusedDay = DateTime.now();
     _isDateSelected = true;
-    _shiftStream = FirebaseFirestore.instance
-        .collection('shifts')
-        .where('shiftUserID', isEqualTo: widget.workerID) // Only this worker
-        .where('shiftDate', isEqualTo: Timestamp.fromDate(_selectedDay!))
-        .snapshots();
+    _updateStream(_selectedDay!);
   }
 
   @override
@@ -96,6 +92,7 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
                       _focusedDay = focusedDay; // update focusedDay as well
                       _isDateSelected = true;
                     });
+                    _updateStream(selectedDay);
                     // TODO: Fetch shifts from Firestore for this specific date!
                     print("Selected Date: $_selectedDay");
                   },
@@ -533,5 +530,19 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
         ],
       ),
     );
+  }
+
+  void _updateStream(DateTime date) {
+    DateTime startOfDay = DateTime(date.year, date.month, date.day, 0, 0, 0);
+    DateTime endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59);
+
+    setState(() {
+      _shiftStream = FirebaseFirestore.instance
+          .collection('shifts')
+          .where('shiftUserID', isEqualTo: widget.workerID)
+          .where('shiftDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+          .where('shiftDate', isLessThanOrEqualTo: Timestamp.fromDate(endOfDay))
+          .snapshots();
+    });
   }
 }
