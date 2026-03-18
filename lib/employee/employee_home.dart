@@ -385,60 +385,39 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
           return;
         }
         
-         // --- CHECK SHIFT ---
-
-        String todayDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
+        // --- CHECK SHIFT ---
+        // 1. Get today's date and strip the time (set to 00:00:00)
+        DateTime now = DateTime.now();
+        DateTime todayMidnight = DateTime(now.year, now.month, now.day);
+        DateTime tomorrowMidnight = todayMidnight.add(const Duration(days: 1));
 
         QuerySnapshot shiftQuery = await FirebaseFirestore.instance
-
             .collection('shifts')
-
-            .where('shiftUserID', isEqualTo: user.uid) // Use your actual field name from Firestore
-
-            .where('shiftDate', isEqualTo: todayDate)
-
+            .where('shiftUserID', isEqualTo: user.uid)
+            .where('shiftStatus', isEqualTo: "accepted")
+            .where('shiftDate', isGreaterThanOrEqualTo: Timestamp.fromDate(todayMidnight))
+            .where('shiftDate', isLessThan: Timestamp.fromDate(tomorrowMidnight))
             .limit(1)
-
             .get();
-
-
 
         DocumentSnapshot? assignedShift = shiftQuery.docs.isNotEmpty ? shiftQuery.docs.first : null;
 
-
-
         // Close loading before showing potential Dialog
-
         Navigator.pop(context);
 
-
-
         if (assignedShift == null) {
-
           bool insist = await _showNoShiftDialog();
-
           if (!insist) return; // Exit if they click "Cancel"
-
         }
 
-
-
         // --- FACE (OPTIONAL) ---
-
         bool faceVerified = true;
-
         // Face verification screen placeholder
-
         if (AppConfig.useFaceVerificationStub) {
-
           // Wait for the stub screen to return 'true'
-
           faceVerified = await Navigator.push(
-
             context,
-
             MaterialPageRoute(builder: (context) => const FaceVerification()),
-
           ) ?? false;
 
         }
@@ -476,6 +455,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
       } catch (e) {
         if (Navigator.canPop(context)) Navigator.pop(context);
         _showSnackBar("System Error: $e", Colors.red);
+        print(e);
       }
     }
   }

@@ -358,7 +358,7 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
             child: const Text("Rejected"),
           ),
         );
-      case 'on leave':
+      case 'on-leave':
         return const SizedBox(
           height: 30,
           width: 100,
@@ -447,13 +447,26 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
     required String taskName,
   }) async {
     // Convert TimeOfDay to String for easy storage
-    String startStr = _startTime.format(context); 
-    String endStr = _endTime.format(context);
+    DateTime startDateTime = DateTime(
+      _selectedDay!.year,
+      _selectedDay!.month,
+      _selectedDay!.day,
+      _startTime.hour,
+      _startTime.minute,
+    );
+
+    DateTime endDateTime = DateTime(
+      _selectedDay!.year,
+      _selectedDay!.month,
+      _selectedDay!.day,
+      _endTime.hour,
+      _endTime.minute,
+    );
 
     await FirebaseFirestore.instance.collection('shifts').add({
       'shiftDate': Timestamp.fromDate(_selectedDay!), 
-      'shiftStartTime': startStr,
-      'shiftEndTime': endStr,
+      'shiftStartTime': Timestamp.fromDate(startDateTime),
+      'shiftEndTime': Timestamp.fromDate(endDateTime),
       'shiftStatus': 'pending',
       'shiftUserID': workerID,
       'shiftTask': taskName,

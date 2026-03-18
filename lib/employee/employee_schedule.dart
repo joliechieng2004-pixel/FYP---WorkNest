@@ -226,6 +226,15 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
 
   // --- Shift ---
   Widget _buildEmployeeShiftCard(Map<String, dynamic> data, String docID, String status) {
+    // 1. Get the Timestamp from Firestore
+    Timestamp date = data['shiftDate'];
+
+    // 2. Convert to DateTime
+    DateTime dateTime = date.toDate();
+
+    // 3. Format to String
+    String formattedDate = DateFormat('MMMMd').format(dateTime); 
+    // Result: March 18, 2026
     return _buildCard(
       color: Colors.white,
       child: Column(
@@ -250,8 +259,12 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                     ),
                     const SizedBox(height: 8),
-                    Text("${data['shiftStartTime']} - ${data['shiftEndTime']}", 
-                        style: const TextStyle(fontSize: 15)),
+                    Text(
+                      // Convert both Timestamps to formatted Time Strings
+                      "${DateFormat.jm().format((data['shiftStartTime'] as Timestamp).toDate())} - "
+                      "${DateFormat.jm().format((data['shiftEndTime'] as Timestamp).toDate())}",
+                      style: const TextStyle(fontSize: 15),
+                    ),
                     const SizedBox(height: 8),
                     Text("Location: ${data['shiftLocation'] ?? 'Workplace'}",
                         style: const TextStyle(color: Colors.grey)),

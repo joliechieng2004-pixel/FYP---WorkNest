@@ -221,28 +221,45 @@ class AuthService {
       
       Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
       String fullName = "${userData['userFName']} ${userData['userLName']}";
+      DateTime now = DateTime.now();
 
-      String todayDate = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      // Document ID Generation
+      String todayDate = DateFormat('yyyy-MM-dd').format(now);
+
+      // Save TimeStamp
+      DateTime todayMidnight = DateTime(now.year, now.month, now.day);
+      // Convert to Firestore Timestamp
+      Timestamp todayTimestamp = Timestamp.fromDate(todayMidnight);
+
       String status = "Unscheduled";
       String? shiftID;
 
       // 2. Fetch gracePeriod
       DocumentSnapshot deptDoc = await _db.collection('departments').doc(deptCode).get();
-      int gracePeriod = deptDoc.exists ? (deptDoc['gracePeriod'] ?? 0) : 0;
+      int gracePeriod = 0;
+      if (deptDoc.exists) {
+        var settings = deptDoc['attendanceSettings'] as Map<String, dynamic>?;
+        gracePeriod = settings?['gracePeriod'] ?? 15; // Default to 15 if missing
+      }
 
-      // 3. Status Logic
-      if (assignedShift != null && assignedShift.exists) {
+      // 2. CHECK FOR APPROVED LEAVE (Integration Step)
+      // We check if a leave document exists for today for this user
+      var leaveQuery = await _db.collection('leaves')
+          .where('leaveUserID', isEqualTo: uid)
+          .where('leaveDate', isEqualTo: todayDate)
+          .where('status', isEqualTo: 'Approved')
+          .get();
+
+      if (leaveQuery.docs.isNotEmpty) {
+        status = "On-Leave";}
+      else if (assignedShift != null && assignedShift.exists) {
         shiftID = assignedShift.id;
         
-        // Use the server time for the most accurate calculation if possible, 
-        // but DateTime.now() is fine for a BIT project.
-        DateTime now = DateTime.now();
-        
         // Ensure startTime is a Timestamp in Firestore
-        DateTime scheduledStart = (assignedShift['startTime'] as Timestamp).toDate();
+        DateTime scheduledStart = (assignedShift['shiftStartTime'] as Timestamp).toDate();
         DateTime deadline = scheduledStart.add(Duration(minutes: gracePeriod));
 
-        status = now.isAfter(deadline) ? "Late" : "On Time";
+        status = now.isAfter(deadline) ? "Late" : "On-Time";
       }
 
       // 4. Atomic Write
@@ -251,7 +268,7 @@ class AuthService {
         'attendanceUserName': fullName,
         'deptCode': deptCode,
         'attendanceLocation': location,
-        'attendanceDate': todayDate,
+        'attendanceDate': todayTimestamp,
         'attendanceStartTime': FieldValue.serverTimestamp(),
         'attendanceEndTime': null,
         'attendanceStatus': status,

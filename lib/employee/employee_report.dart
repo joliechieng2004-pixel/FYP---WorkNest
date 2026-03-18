@@ -216,7 +216,7 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
     required String status,
   }) {
     // Define color based on status
-    Color statusColor = status == "On Time" 
+    Color statusColor = status == "On-Time" 
         ? Colors.green 
         : status == "Late" ? Colors.red : Colors.orange;
     

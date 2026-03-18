@@ -126,7 +126,8 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
     bool isExpanded = _expandedIndex == index;
     // Extract data from Firestore document
     Map<String, dynamic> worker = doc.data() as Map<String, dynamic>;
-    String name = worker['userLName'] ?? 'Unknown';
+    String fName = worker['userFName' ] ?? 'Unknown';
+    String lName = worker['userLName' ] ?? 'Unknown';
     String status = (worker['isActive'] ?? true) ? "Active" : "Inactive";
     // For now, ID can be the last 3 digits of the Doc ID or a specific field
     String workerId = doc.id.substring(doc.id.length - 3).toUpperCase();
@@ -153,7 +154,7 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
             Row(
               children: [
                 Expanded(flex: 1, child: Center(child: Text(workerId, style: const TextStyle(fontWeight: FontWeight.bold)))),
-                Expanded(flex: 3, child: Center(child: Text(name))),
+                Expanded(flex: 3, child: Center(child: Text("$fName $lName"))),
                 const Expanded(flex: 2, child: Center(child: Text("90%"))), // Attendance logic later
                 Expanded(
                   flex: 2, 
@@ -173,10 +174,10 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   _actionButton("View Profile", Colors.white, () {
-                    print("Viewing profile of $name");
+                    print("Viewing profile of $fName $lName");
                   }),
                   _actionButton("Remove Worker", Colors.white, () {
-                    _showRemoveConfirmation(doc.id, name);}, isDelete: true),
+                    _showRemoveConfirmation(doc.id);}, isDelete: true),
                 ],
               ),
             ]
@@ -217,7 +218,7 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
     );
   }
 
-  void _showRemoveConfirmation(String docId, String name) {
+  void _showRemoveConfirmation(String docId) {
     showDialog(
       context: context,
       builder: (BuildContext context) {

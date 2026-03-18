@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
@@ -12,10 +14,12 @@ class ManagerReportPage extends StatefulWidget {
 }
 
 class _ManagerReportPageState extends State<ManagerReportPage> {
-  final Color primaryBlue = const Color(0xFF1A3E88);
+  final Color primaryBlue = const Color.fromARGB(255, 40, 75, 158);
+  final Color bgLightBlue = const Color.fromARGB(255, 240, 250, 255);
   int? _expandedIndex;
+  String _selectedPeriod = "Weekly";
   
-  late Stream<QuerySnapshot> _attendanceStream;
+  Stream<QuerySnapshot>? _attendanceStream;
   
   @override
   void initState() {
@@ -55,7 +59,7 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
               _buildAttendanceTab(),
           
               // --- RIGHT TAB: REPORT (PLACEHOLDER) ---
-              _buildReportsPlaceholder(),
+              _buildReportsTab(),
             ],
           ),
         ),
@@ -92,7 +96,7 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
                 _buildCustomHeader(),
                 const Divider(height: 1, color: Color(0xFF1A3E88)),
                 
-                // Scrollable List of Workers
+                // Scrollable List of Attendance
                 Expanded(
                   child: StreamBuilder<QuerySnapshot>(
                     stream: _attendanceStream,
@@ -116,8 +120,8 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
                           var doc = snapshot.data!.docs[index];
                           var data = doc.data() as Map<String, dynamic>;
                           DateTime recordDate;
-                          if (data['timestamp'] != null && data['timestamp'] is Timestamp) {
-                            recordDate = (data['timestamp'] as Timestamp).toDate();
+                          if (data['attendanceDate'] != null && data['attendanceDate'] is Timestamp) {
+                            recordDate = (data['attendanceDate'] as Timestamp).toDate();
                           } else {
                             recordDate = DateTime.now(); 
                           }
@@ -145,9 +149,10 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
         children: [
           //TODO: change from ID to checkbox
           Expanded(flex: 1, child: Center(child: Text("#", style: TextStyle(fontWeight: FontWeight.bold)))),
-          Expanded(flex: 2, child: Center(child: Text("Date", style: TextStyle(fontWeight: FontWeight.bold)))),
+          Expanded(flex: 3, child: Center(child: Text("Date", style: TextStyle(fontWeight: FontWeight.bold)))),
           Expanded(flex: 3, child: Center(child: Text("Worker", style: TextStyle(fontWeight: FontWeight.bold)))),
           Expanded(flex: 2, child: Center(child: Text("Status", style: TextStyle(fontWeight: FontWeight.bold)))),
+          Expanded(flex: 1, child: Center(child: Text(" ", style: TextStyle(fontWeight: FontWeight.bold)))),
         ],
       ),
     );
@@ -175,8 +180,8 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
     }
 
     // 2. Format the times for display
-    String formattedStartTime = start != null ? DateFormat('hh:mm:ss a').format(start) : "--:--";
-    String formattedEndTime = end != null ? DateFormat('hh:mm:ss a').format(end) : "--:--";
+    String formattedStartTime = start != null ? DateFormat.jm().format(start) : "--:--";
+    String formattedEndTime = end != null ? DateFormat.jm().format(end) : "--:--";
     String formattedDate = day != null ? DateFormat('dd MMM yyyy').format(day) : "No Date Recorded";
 
     // 1.5 Calculate Duration
@@ -193,7 +198,7 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
       formattedDuration = "In Progress";
     }
 
-    String status = attendance['attendanceStatus']?.toString() ?? 'Pending';
+    String status = attendance['attendanceApproval']?.toString() ?? 'Pending';
     String workerName = attendance['attendanceUserName']?.toString() ?? 'Unknown User';
 
     bool isExpanded = _expandedIndex == index;
@@ -233,18 +238,31 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
                 ),
                 Expanded(flex: 3, child: Center(child: Text(formattedDate))),
                 Expanded(flex: 3, child: Center(child: Text(workerName))),
-                Expanded(flex: 2, child: Center(
-                  child: Text(
-                    status,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: status == "Approved" 
-                          ? Colors.green 
-                          : status == "Rejected" 
-                              ? Colors.red 
-                              : Colors.orange, // Orange for "Pending"
-                    ),
-                  ))),
+                Expanded(
+                  flex: 2, 
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Punctuality Status (The one calculated by auth_service)
+                      Text(
+                        attendance['attendanceStatus'] ?? 'Unscheduled',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: attendance['attendanceStatus'] == "Late" ? Colors.red : Colors.blue,
+                        ),
+                      ),
+                      // Approval Status (The one the manager clicks)
+                      Text(
+                        status, // Your existing 'Pending/Approved' variable
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: status == "Approved" ? Colors.green : Colors.grey,
+                        ),
+                      ),
+                    ],
+                  )
+                ),
                 Expanded(flex: 1, child: Icon(isExpanded ? Icons.expand_less : Icons.expand_more, size: 18)),
               ],
             ),
@@ -297,31 +315,97 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
     return const Row(children: [Icon(Icons.filter_list), SizedBox(width: 5), Text("Filter")]);
   }
 
-  void addWorker(){
-    print("temporary method");
-  }
+  Widget _buildReportsTab() {
+    DateTime startDate = _getStartTime(_selectedPeriod);
+    Timestamp startTimestamp = Timestamp.fromDate(startDate);
+    Timestamp endTimestamp = Timestamp.now(); // Up to this exact moment
 
-  Widget _buildReportsPlaceholder() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.analytics_outlined, size: 80, color: Colors.grey[400]),
-          const SizedBox(height: 16),
-          Text(
-            "Report Module Coming Soon",
-            style: TextStyle(fontSize: 18, color: Colors.grey[600], fontWeight: FontWeight.w500),
+    return Column(
+      children: [
+        // 1. The Period Switcher
+        Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: SegmentedButton<String>(
+            segments: const [
+              ButtonSegment(value: "Weekly", label: Text("Week")),
+              ButtonSegment(value: "Monthly", label: Text("Month")),
+              ButtonSegment(value: "Yearly", label: Text("Year")),
+            ],
+            selected: {_selectedPeriod},
+            onSelectionChanged: (Set<String> newSelection) {
+              setState(() {
+                _selectedPeriod = newSelection.first;
+              });
+            },
           ),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 40, vertical: 8),
-            child: Text(
-              "This section will later include data visualization and shift efficiency metrics.",
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey),
-            ),
+        ),
+
+        // 2. The Data Stream
+        Expanded(
+          child: StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('attendances')
+                .where('deptCode', isEqualTo: widget.deptCode)
+                .where('attendanceDate', isGreaterThanOrEqualTo: startTimestamp)
+                .where('attendanceDate', isLessThanOrEqualTo: endTimestamp)
+                .snapshots(),
+            builder: (context, snapshot) {
+
+              if (snapshot.hasError){
+                print(snapshot.error);}
+
+              if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              // 3. Handle Empty State (Query finished but found 0 records)
+              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                return Column(
+                  children: [
+                    _buildPeriodToggle(), // Keep the toggle so user can switch back
+                    const Expanded(child: Center(child: Text("No records found for this period."))),
+                  ],
+                );
+              }
+
+              var docs = snapshot.data!.docs;
+              int total = docs.length;
+              int lateCount = docs.where((d) => (d.data() as Map<String, dynamic>)['attendanceStatus'] == "Late").length;
+              int onTimeCount = docs.where((d) => (d.data() as Map<String, dynamic>)['attendanceStatus'] == "On-Time").length;
+              int unscheduledCount = docs.where((d) => (d.data() as Map<String, dynamic>)['attendanceStatus'] == "Unscheduled").length;
+
+              return SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Column(
+                  children: [
+                    Text("Summary for $_selectedPeriod", 
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 20),
+                    
+                    // Reusing your Stat Chips
+                    Row(
+                      children: [
+                        _buildStatChip("Total Records", total.toString(), Colors.blue),
+                        const SizedBox(width: 10),
+                        _buildStatChip("On-Time", onTimeCount.toString(), Colors.green),
+                        const SizedBox(width: 10),
+                        _buildStatChip("Late", lateCount.toString(), Colors.red),
+                        const SizedBox(width: 10),
+                        _buildStatChip("Unscheduled", unscheduledCount.toString(), Colors.orange),
+                      ],
+                    ),
+                    
+                    const SizedBox(height: 30),
+                    
+                    // Data Visualization Placeholder
+                    _buildSimpleBarChart(onTimeCount, lateCount),
+                  ],
+                ),
+              );
+            },
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -333,7 +417,7 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
           .collection('attendances')
           .doc(docId)
           .update({
-        'attendanceStatus': newStatus,
+        'attendanceApproval': newStatus,
       });
 
       // Show a small confirmation to the manager
@@ -354,5 +438,131 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
         );
       }
     }
+  }
+
+  DateTime _getStartTime(String period) {
+    DateTime now = DateTime.now();
+    switch (period) {
+      case "Weekly":
+        // Gets the start of the current week (Monday)
+        return now.subtract(Duration(days: now.weekday - 1)).copyWith(hour: 0, minute: 0, second: 0);
+      case "Monthly":
+        // Gets the 1st day of the current month
+        return DateTime(now.year, now.month, 1);
+      case "Yearly":
+        // Gets Jan 1st of the current year
+        return DateTime(now.year, 1, 1);
+      default:
+        return now;
+    }
+  }
+
+  Widget _buildStatChip(String label, String value, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(15),
+        decoration: BoxDecoration(
+          color: bgLightBlue,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: color.withOpacity(0.5), width: 5),
+        ),
+        child: Column(
+          children: [
+            Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
+            Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: color.withOpacity(0.8))),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSimpleBarChart(int onTime, int late) {
+    int total = onTime + late;
+    // Prevent division by zero
+    double onTimeWidth = total == 0 ? 0.5 : (onTime / total);
+    double lateWidth = total == 0 ? 0.5 : (late / total);
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(15),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text("Punctuality Distribution", 
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          const SizedBox(height: 20),
+          
+          // The actual Bar
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Row(
+              children: [
+                // On-Time Segment
+                Expanded(
+                  flex: (onTimeWidth * 100).toInt(),
+                  child: Container(height: 30, color: Colors.green),
+                ),
+                // Late Segment
+                Expanded(
+                  flex: (lateWidth * 100).toInt(),
+                  child: Container(height: 30, color: Colors.orange),
+                ),
+              ],
+            ),
+          ),
+          
+          const SizedBox(height: 15),
+          
+          // Legend
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildLegendItem("On-Time", Colors.green, "${(onTimeWidth * 100).toInt()}%"),
+              _buildLegendItem("Late", Colors.orange, "${(lateWidth * 100).toInt()}%"),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLegendItem(String label, Color color, String percentage) {
+    return Row(
+      children: [
+        Container(width: 12, height: 12, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        const SizedBox(width: 8),
+        Text("$label ($percentage)", style: const TextStyle(fontSize: 12, color: Colors.black54)),
+      ],
+    );
+  }
+
+  Widget _buildPeriodToggle() {
+    return Padding(
+      padding: const EdgeInsets.all(20.0),
+      child: SegmentedButton<String>(
+        // Define the choices
+        segments: const [
+          ButtonSegment(value: "Weekly", label: Text("Week")),
+          ButtonSegment(value: "Monthly", label: Text("Month")),
+          ButtonSegment(value: "Yearly", label: Text("Year")),
+        ],
+        // Tell it which one is currently highlighted
+        selected: {_selectedPeriod},
+        // What happens when a user clicks a new one
+        onSelectionChanged: (Set<String> newSelection) {
+          setState(() {
+            _selectedPeriod = newSelection.first;
+            // This triggers the StreamBuilder to restart with new dates!
+          });
+        },
+        style: SegmentedButton.styleFrom(
+          selectedBackgroundColor: const Color(0xFF1A3E88),
+          selectedForegroundColor: Colors.white,
+        ),
+      ),
+    );
   }
 }

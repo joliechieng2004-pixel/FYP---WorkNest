@@ -78,7 +78,7 @@ class _ManagerHomePageState extends State<ManagerHome> {
     
     // 1. Define the pages
     final List<Widget> pages = [
-      _buildHomeDashboard(context),                         // Index 0 - Home Page
+      _buildHomeDashboard(deptCode),                         // Index 0 - Home Page
       ManagerSchedule(deptCode: deptCode),                  // Index 1 - Schedule Page
       ManagerEmployee(deptCode: deptCode),                  // Index 2 - Employee Page
       ManagerReportPage(deptCode: deptCode),                // Index 3 - Report Page
@@ -120,7 +120,7 @@ class _ManagerHomePageState extends State<ManagerHome> {
     );
   }
 
-  SafeArea _buildHomeDashboard(BuildContext context) {
+  SafeArea _buildHomeDashboard(String deptCode) {
     return SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -148,6 +148,12 @@ class _ManagerHomePageState extends State<ManagerHome> {
                   ),
                 ),
               ]),
+
+            const SizedBox(height: 10),
+
+            _buildCard(
+              child: _buildReportsTab(deptCode)
+            ),
 
             const SizedBox(height: 10),
         
@@ -298,5 +304,110 @@ class _ManagerHomePageState extends State<ManagerHome> {
         _totalEmployees = querySnapshot.docs.length;
       });
     }
+  }
+
+  Widget _buildStatChip(String label, String value, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(15),
+        decoration: BoxDecoration(
+          color: bgLightBlue,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: color.withOpacity(0.5), width: 5),
+        ),
+        child: Column(
+          children: [
+            Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
+            Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: color.withOpacity(0.8))),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReportsTab(String deptCode) {
+    // 1. Define 'Today' at Midnight for the query
+    DateTime now = DateTime.now();
+    Timestamp todayStart = Timestamp.fromDate(DateTime(now.year, now.month, now.day));
+
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('attendances')
+          .where('deptCode', isEqualTo: deptCode)
+          .where('attendanceDate', isEqualTo: todayStart)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+
+        // 2. Calculate Metrics from the snapshot
+        int totalPresent = snapshot.data!.docs.length;
+        int lateCount = snapshot.data!.docs.where((d) => d['attendanceStatus'] == "Late").length;
+        int onTimeCount = snapshot.data!.docs.where((d) => d['attendanceStatus'] == "On-Time").length;
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text("Today's Overview", 
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1A3E88))),
+              const SizedBox(height: 20),
+              
+              // 3. The Summary Row
+              Row(
+                children: [
+                  _buildStatChip("Present", totalPresent.toString(), Colors.blue),
+                  const SizedBox(width: 10),
+                  _buildStatChip("On-Time", onTimeCount.toString(), Colors.green),
+                  const SizedBox(width: 10),
+                  _buildStatChip("Late", lateCount.toString(), Colors.orange),
+                ],
+              ),
+              
+              const SizedBox(height: 30),
+              
+              // 4. Visual Progress Section (Great for FYP marks!)
+              const Text("Punctuality Rate", style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: LinearProgressIndicator(
+                  value: totalPresent == 0 ? 0 : onTimeCount / totalPresent,
+                  minHeight: 12,
+                  backgroundColor: Colors.grey[200],
+                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.green),
+                ),
+              ),
+              const SizedBox(height: 5),
+              Text("${totalPresent == 0 ? 0 : ((onTimeCount / totalPresent) * 100).toInt()}% of arrived staff are on time",
+                style: TextStyle(fontSize: 12, color: Colors.grey[600])),
+              
+              const SizedBox(height: 40),
+              
+              // 5. Quick Actions or Notifications
+              if (lateCount > 0)
+                Container(
+                  padding: const EdgeInsets.all(15),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.amber.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded, color: Colors.orange),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text("$lateCount staff members arrived after the grace period today.",
+                          style: const TextStyle(fontSize: 13, color: Colors.black87)),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }
