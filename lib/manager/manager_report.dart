@@ -316,98 +316,67 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
   }
 
   Widget _buildReportsTab() {
-    DateTime startDate = _getStartTime(_selectedPeriod);
-    Timestamp startTimestamp = Timestamp.fromDate(startDate);
-    Timestamp endTimestamp = Timestamp.now(); // Up to this exact moment
-
-    return Column(
+  DateTime startDate = _getStartTime(_selectedPeriod);
+  
+  return SingleChildScrollView(
+    padding: const EdgeInsets.symmetric(horizontal: 20),
+    child: Column(
       children: [
-        // 1. The Period Switcher
-        Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: SegmentedButton<String>(
-            segments: const [
-              ButtonSegment(value: "Weekly", label: Text("Week")),
-              ButtonSegment(value: "Monthly", label: Text("Month")),
-              ButtonSegment(value: "Yearly", label: Text("Year")),
-            ],
-            selected: {_selectedPeriod},
-            onSelectionChanged: (Set<String> newSelection) {
-              setState(() {
-                _selectedPeriod = newSelection.first;
-              });
-            },
-          ),
-        ),
+        _buildPeriodToggle(), // Moved to the TOP, outside the Stream
 
-        // 2. The Data Stream
-        Expanded(
-          child: StreamBuilder<QuerySnapshot>(
-            stream: FirebaseFirestore.instance
-                .collection('attendances')
-                .where('deptCode', isEqualTo: widget.deptCode)
-                .where('attendanceDate', isGreaterThanOrEqualTo: startTimestamp)
-                .where('attendanceDate', isLessThanOrEqualTo: endTimestamp)
-                .snapshots(),
-            builder: (context, snapshot) {
-
-              if (snapshot.hasError){
-                print(snapshot.error);}
-
-              if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-                return const Center(child: CircularProgressIndicator());
-              }
-
-              // 3. Handle Empty State (Query finished but found 0 records)
-              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                return Column(
+        const SizedBox(height: 20),
+        
+        StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('attendances')
+              .where('deptCode', isEqualTo: widget.deptCode)
+              .where('attendanceDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+            
+            final docs = snapshot.data!.docs;
+            if (docs.isEmpty) return const Center(child: Text("No records found."));
+            
+            // 1. Logic: Extract counts into a Map for cleaner access
+            final stats = _calculateStats(docs);
+            
+            // 2. UI: Return a scrollable view of pre-made components
+            return Column(
+              children: [
+                // --- Section 1: Status ---
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  alignment: WrapAlignment.center,
                   children: [
-                    _buildPeriodToggle(), // Keep the toggle so user can switch back
-                    const Expanded(child: Center(child: Text("No records found for this period."))),
-                  ],
-                );
-              }
-
-              var docs = snapshot.data!.docs;
-              int total = docs.length;
-              int lateCount = docs.where((d) => (d.data() as Map<String, dynamic>)['attendanceStatus'] == "Late").length;
-              int onTimeCount = docs.where((d) => (d.data() as Map<String, dynamic>)['attendanceStatus'] == "On-Time").length;
-              int unscheduledCount = docs.where((d) => (d.data() as Map<String, dynamic>)['attendanceStatus'] == "Unscheduled").length;
-
-              return SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Column(
-                  children: [
-                    Text("Summary for $_selectedPeriod", 
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 20),
-                    
-                    // Reusing your Stat Chips
-                    Row(
-                      children: [
-                        _buildStatChip("Total Records", total.toString(), Colors.blue),
-                        const SizedBox(width: 10),
-                        _buildStatChip("On-Time", onTimeCount.toString(), Colors.green),
-                        const SizedBox(width: 10),
-                        _buildStatChip("Late", lateCount.toString(), Colors.red),
-                        const SizedBox(width: 10),
-                        _buildStatChip("Unscheduled", unscheduledCount.toString(), Colors.orange),
-                      ],
-                    ),
-                    
-                    const SizedBox(height: 30),
-                    
-                    // Data Visualization Placeholder
-                    _buildSimpleBarChart(onTimeCount, lateCount),
+                    // Access the values using the keys defined in the Map
+                    _buildStatChip("Total", "${stats['total']}", Colors.blue),
+                    _buildStatChip("On-Time", "${stats['onTime']}", Colors.green),
+                    _buildStatChip("Late", "${stats['late']}", Colors.red),
+                    _buildStatChip("Other", "${stats['unscheduled']}", Colors.orange),
                   ],
                 ),
-              );
-            },
-          ),
+                const SizedBox(height: 20),
+            
+                // --- Section 2: Chart ---
+                _buildSimpleBarChart(stats['onTime']!, stats['late']!),
+
+                const SizedBox(height: 20),
+            
+                // --- Section 3: Absent List ---
+                const Text("Today's Missing Staff", 
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87)),
+                const SizedBox(height: 10),
+                _buildAbsentReportSection(),
+              ],
+            );
+          },
         ),
       ],
-    );
-  }
+    ),
+  );
+}
 
   void onChanged(bool? value) {}
   
@@ -458,20 +427,25 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
   }
 
   Widget _buildStatChip(String label, String value, Color color) {
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.all(15),
-        decoration: BoxDecoration(
-          color: bgLightBlue,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color.withOpacity(0.5), width: 5),
-        ),
-        child: Column(
-          children: [
-            Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
-            Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: color.withOpacity(0.8))),
-          ],
-        ),
+    // Calculates width to fit 2 chips per row comfortably
+    double cardWidth = (MediaQuery.of(context).size.width / 4) - 20;
+
+    return Container(
+      width: cardWidth,
+      padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 5),
+      decoration: BoxDecoration(
+        color: bgLightBlue,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.5), width: 5),
+        boxShadow: [
+          BoxShadow(color: color.withOpacity(0.05), blurRadius: 5, offset: const Offset(0, 2))
+        ],
+      ),
+      child: Column(
+        children: [
+          Text(value, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: color)),
+          Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[600])),
+        ],
       ),
     );
   }
@@ -482,50 +456,54 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
     double onTimeWidth = total == 0 ? 0.5 : (onTime / total);
     double lateWidth = total == 0 ? 0.5 : (late / total);
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.grey[50],
-        borderRadius: BorderRadius.circular(15),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text("Punctuality Distribution", 
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-          const SizedBox(height: 20),
-          
-          // The actual Bar
-          ClipRRect(
-            borderRadius: BorderRadius.circular(10),
-            child: Row(
-              children: [
-                // On-Time Segment
-                Expanded(
-                  flex: (onTimeWidth * 100).toInt(),
-                  child: Container(height: 30, color: Colors.green),
-                ),
-                // Late Segment
-                Expanded(
-                  flex: (lateWidth * 100).toInt(),
-                  child: Container(height: 30, color: Colors.orange),
-                ),
-              ],
-            ),
+    return Column(
+      children: [
+        const Text("Punctuality Distribution", 
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        Container(
+          margin: const EdgeInsets.all(10),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.grey[50],
+            border: Border.all(color: primaryBlue, width: 2),
+            borderRadius: BorderRadius.circular(15),
           ),
-          
-          const SizedBox(height: 15),
-          
-          // Legend
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildLegendItem("On-Time", Colors.green, "${(onTimeWidth * 100).toInt()}%"),
-              _buildLegendItem("Late", Colors.orange, "${(lateWidth * 100).toInt()}%"),
+              // Legend
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _buildLegendItem("On-Time", Colors.green, "${(onTimeWidth * 100).toInt()}%"),
+                  _buildLegendItem("Late", Colors.orange, "${(lateWidth * 100).toInt()}%"),
+                ],
+              ),
+              
+              const SizedBox(height: 10),
+              
+              // The actual Bar
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Row(
+                  children: [
+                    // On-Time Segment
+                    Expanded(
+                      flex: (onTimeWidth * 100).toInt().clamp(1, 100),
+                      child: Container(height: 30, color: Colors.green),
+                    ),
+                    // Late Segment
+                    Expanded(
+                      flex: (lateWidth * 100).toInt().clamp(1, 100),
+                      child: Container(height: 30, color: Colors.orange),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -534,7 +512,7 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
       children: [
         Container(width: 12, height: 12, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
         const SizedBox(width: 8),
-        Text("$label ($percentage)", style: const TextStyle(fontSize: 12, color: Colors.black54)),
+        Text("$label ($percentage)", style: const TextStyle(fontSize: 14, color: Colors.black87)),
       ],
     );
   }
@@ -559,10 +537,173 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
           });
         },
         style: SegmentedButton.styleFrom(
-          selectedBackgroundColor: const Color(0xFF1A3E88),
-          selectedForegroundColor: Colors.white,
+          selectedBackgroundColor: primaryBlue,
+          selectedForegroundColor: bgLightBlue,
+          side: const BorderSide(width: 1),
         ),
       ),
+    );
+  }
+
+  Map<String, int> _calculateStats(List<QueryDocumentSnapshot> docs) {
+    int onTime = 0;
+    int late = 0;
+    int unscheduled = 0;
+
+    for (var doc in docs) {
+      // 1. Safely extract the data
+      final data = doc.data() as Map<String, dynamic>;
+      
+      // 2. Get the status string (default to Unscheduled if null)
+      final String status = data['attendanceStatus']?.toString() ?? 'Unscheduled';
+
+      // 3. Increment the correct counter in one single loop
+      switch (status) {
+        case 'On-Time':
+          onTime++;
+          break;
+        case 'Late':
+          late++;
+          break;
+        default:
+          unscheduled++;
+          break;
+      }
+    }
+
+    // 4. Return everything in a tidy Map
+    return {
+      'onTime': onTime,
+      'late': late,
+      'unscheduled': unscheduled,
+      'total': docs.length,
+    };
+  }
+
+  Widget _buildAbsentReportSection() {
+    DateTime now = DateTime.now();
+    DateTime todayStart = DateTime(now.year, now.month, now.day);
+    DateTime tomorrowStart = todayStart.add(const Duration(days: 1));
+
+    return StreamBuilder<QuerySnapshot>(
+      // Fetch today's shifts
+      stream: FirebaseFirestore.instance
+          .collection('shifts')
+          .where('deptCode', isEqualTo: widget.deptCode)
+          .where('shiftStatus', isEqualTo: 'accepted')
+          .where('shiftDate', isGreaterThanOrEqualTo: Timestamp.fromDate(todayStart))
+          .where('shiftDate', isLessThan: Timestamp.fromDate(tomorrowStart))
+          .snapshots(),
+      builder: (context, shiftSnapshot) {
+        if (!shiftSnapshot.hasData)
+          print(shiftSnapshot.error);
+
+        return StreamBuilder<QuerySnapshot>(
+          // Fetch today's attendances
+          stream: FirebaseFirestore.instance
+              .collection('attendances')
+              .where('deptCode', isEqualTo: widget.deptCode)
+              .where('attendanceDate', isGreaterThanOrEqualTo: Timestamp.fromDate(todayStart))
+              .snapshots(),
+          builder: (context, attendanceSnapshot) {
+            if (!attendanceSnapshot.hasData) return const SizedBox();
+
+            // Compare UIDs
+            final presentUIDs = attendanceSnapshot.data!.docs
+                .map((doc) => (doc.data() as Map<String, dynamic>)['uid'].toString())
+                .toSet();
+
+            final absentDocs = shiftSnapshot.data!.docs.where((shiftDoc) {
+              final shiftData = shiftDoc.data() as Map<String, dynamic>;
+              return !presentUIDs.contains(shiftData['shiftUserID']);
+            }).toList();
+
+            if (absentDocs.isEmpty) {
+              return Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(15),
+                decoration: BoxDecoration(color: Colors.green.withOpacity(0.05), borderRadius: BorderRadius.circular(10)),
+                child: const Text("✨ Everyone has reported for duty today.", 
+                  style: TextStyle(color: Colors.green, fontSize: 13)),
+              );
+            }
+
+            // THE REPORT TABLE STYLE
+            return Container(
+              margin: const EdgeInsets.all(10),
+              padding: const EdgeInsets.all(5),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                border: Border.all(color: primaryBlue, width: 2),
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Column(
+                children: [
+                  // Minimalist Table Header
+                  Container(
+                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
+                    decoration: BoxDecoration(color: bgLightBlue, borderRadius: BorderRadius.circular(15),),
+                    child: const Row(
+                      children: [
+                        Expanded(flex: 3, child: Text("Date", textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14))),
+                        Expanded(flex: 3, child: Text("Name", textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14))),
+                        Expanded(flex: 2, child: Text("Shift Start", textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14))),
+                        Expanded(flex: 2, child: Text("Status", textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14))),
+                      ],
+                    ),
+                  ),
+                  // Table Rows
+                  ...absentDocs.map((doc) {
+                    final data = doc.data() as Map<String, dynamic>;
+                    String time = data['shiftStartTime'] != null 
+                      ? DateFormat.jm().format((data['shiftStartTime'] as Timestamp).toDate()) 
+                      : "--";
+                    String date = data['shiftDate'] != null 
+                      ? DateFormat('dd MMM yyyy').format((data['shiftDate'] as Timestamp).toDate())
+                      : "--";
+                    
+                    return Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 15),
+                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(15),),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            flex: 3,
+                            child: Text(
+                              date,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontSize: 14))),
+                          Expanded(
+                            flex: 3,
+                            child: Text(
+                              data['shiftUserName'] ?? "Unknown",
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontSize: 14))),
+                          Expanded(
+                            flex: 2,
+                            child: Text(
+                              time,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(fontSize: 14))),
+                          const Expanded(
+                            flex: 2,
+                            child: Text(
+                              "Absent",
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold, 
+                                fontSize: 14, 
+                                color: Colors.red))),
+                        ],
+                      ),
+                    );
+                  }),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }

@@ -446,33 +446,52 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
     required String workerID,
     required String taskName,
   }) async {
-    // Convert TimeOfDay to String for easy storage
-    DateTime startDateTime = DateTime(
-      _selectedDay!.year,
-      _selectedDay!.month,
-      _selectedDay!.day,
-      _startTime.hour,
-      _startTime.minute,
-    );
+    try{
+      DocumentSnapshot workerDoc = await FirebaseFirestore.instance
+        .collection('users') 
+        .doc(workerID)
+        .get();
 
-    DateTime endDateTime = DateTime(
-      _selectedDay!.year,
-      _selectedDay!.month,
-      _selectedDay!.day,
-      _endTime.hour,
-      _endTime.minute,
-    );
+      String fullName = "Unknown";
 
-    await FirebaseFirestore.instance.collection('shifts').add({
-      'shiftDate': Timestamp.fromDate(_selectedDay!), 
-      'shiftStartTime': Timestamp.fromDate(startDateTime),
-      'shiftEndTime': Timestamp.fromDate(endDateTime),
-      'shiftStatus': 'pending',
-      'shiftUserID': workerID,
-      'shiftTask': taskName,
-      'deptCode': widget.deptCode, // Using widget.deptCode from the constructor
-      'createdAt': FieldValue.serverTimestamp(),
-    });
+      if (workerDoc.exists) {
+        final data = workerDoc.data() as Map<String, dynamic>;
+        String fName = data['userFName'] ?? "";
+        String lName = data['userLName'] ?? "";
+        fullName = "$fName $lName".trim();
+      }
+
+      // Convert TimeOfDay to String for easy storage
+      DateTime startDateTime = DateTime(
+        _selectedDay!.year,
+        _selectedDay!.month,
+        _selectedDay!.day,
+        _startTime.hour,
+        _startTime.minute,
+      );
+
+      DateTime endDateTime = DateTime(
+        _selectedDay!.year,
+        _selectedDay!.month,
+        _selectedDay!.day,
+        _endTime.hour,
+        _endTime.minute,
+      );
+
+      await FirebaseFirestore.instance.collection('shifts').add({
+        'shiftDate': Timestamp.fromDate(_selectedDay!), 
+        'shiftStartTime': Timestamp.fromDate(startDateTime),
+        'shiftEndTime': Timestamp.fromDate(endDateTime),
+        'shiftStatus': 'pending',
+        'shiftUserID': workerID,
+        'shiftUserName': fullName,
+        'shiftTask': taskName,
+        'deptCode': widget.deptCode, // Using widget.deptCode from the constructor
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+    debugPrint("Error assigning shift: $e");
+    }
   }
 
   // Feature - Confirm Before Removing a Shift Under Status [pending, accepted, rejected]
