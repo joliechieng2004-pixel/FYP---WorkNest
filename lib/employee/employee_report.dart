@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:worknest/services/pdf_service.dart';
 
 class EmployeeReport extends StatefulWidget {
   final String deptCode;
@@ -18,6 +19,9 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
   final Color bgLightBlue = const Color.fromARGB(255, 240, 250, 255);
   
   final ScrollController _timesheetScrollController = ScrollController();
+
+  String _selectedPeriod = "Weekly";
+  List<QueryDocumentSnapshot> _currentDocs = [];
   Stream<QuerySnapshot>? _attendanceStream;
 
   // --- INITIALIZATION ---
@@ -25,8 +29,13 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
   void initState() {
     super.initState();
     debugPrint(widget.workerID);
-    _initAttendanceStream();
-  }
+    _attendanceStream = FirebaseFirestore.instance
+          .collection('attendances')
+          .where('attendanceUserId', isEqualTo: widget.workerID)
+          .where('attendanceDate', isGreaterThanOrEqualTo: Timestamp.fromDate(_getStartDate()))
+          .orderBy('attendanceDate', descending: true)
+          .snapshots();
+    }
 
   @override
   void dispose() {
@@ -67,6 +76,8 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
                 ),
               ),
 
+              _buildPeriodToggle(),
+
               // Leave Requests (Scrollable Version)
               _buildCard(
                 child: Column(
@@ -98,6 +109,9 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
                               if (snapshot.connectionState == ConnectionState.waiting) {
                                 return const Center(child: CircularProgressIndicator());
                               }
+
+                              _currentDocs = snapshot.data?.docs ?? []; // Save for export
+
                               if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                                 return const Center(child: Text("No attendance records found."));
                               }
@@ -156,6 +170,33 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
                   ],
                 ),
               ),
+
+              const SizedBox(height: 10),
+
+              ElevatedButton.icon(
+                icon: const Icon(Icons.picture_as_pdf),
+                label: const Text("Export My Report", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: bgLightBlue,
+                  foregroundColor: primaryBlue,
+                  side: BorderSide(width: 2, color: primaryBlue),
+                  padding: EdgeInsets.all(20)),
+                onPressed: () {
+                  if (_currentDocs.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text("No data available for the selected period.")),
+                    );
+                    return;
+                  }
+                  PdfExportService.exportAttendanceReport(
+                    title: "My Attendance Report",
+                    docs: _currentDocs, // This is the 'docs' variable from your StreamBuilder
+                    period: _selectedPeriod,
+                  );
+                },
+              ),
+
+              const SizedBox(height: 10),
             ],
           ),
         ),
@@ -273,13 +314,38 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
     );
   }
 
-  void _initAttendanceStream() {
-    // We initialize the stream ONCE here.
-    // This prevents the flickering issue.
-    _attendanceStream = FirebaseFirestore.instance
-        .collection('attendances')
-        .where('attendanceUserId', isEqualTo: widget.workerID)
-        .orderBy('attendanceDate', descending: true)
-        .snapshots();
+  DateTime _getStartDate() {
+    DateTime now = DateTime.now();
+    if (_selectedPeriod == 'Weekly') return now.subtract(const Duration(days: 7));
+    if (_selectedPeriod == 'Monthly') return now.subtract(const Duration(days: 30));
+    return DateTime(now.year, 1, 1); // Yearly (Start of current year)
+  }
+
+  Widget _buildPeriodToggle() {
+    return Padding(
+      padding: const EdgeInsets.all(20.0),
+      child: SegmentedButton<String>(
+        // Define the choices
+        segments: const [
+          ButtonSegment(value: "Weekly", label: Text("Week")),
+          ButtonSegment(value: "Monthly", label: Text("Month")),
+          ButtonSegment(value: "Yearly", label: Text("Year")),
+        ],
+        // Tell it which one is currently highlighted
+        selected: {_selectedPeriod},
+        // What happens when a user clicks a new one
+        onSelectionChanged: (Set<String> newSelection) {
+          setState(() {
+            _selectedPeriod = newSelection.first;
+            // This triggers the StreamBuilder to restart with new dates!
+          });
+        },
+        style: SegmentedButton.styleFrom(
+          selectedBackgroundColor: primaryBlue,
+          selectedForegroundColor: bgLightBlue,
+          side: const BorderSide(width: 1),
+        ),
+      ),
+    );
   }
 }

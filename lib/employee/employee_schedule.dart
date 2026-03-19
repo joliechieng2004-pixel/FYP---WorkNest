@@ -226,15 +226,23 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
 
   // --- Shift ---
   Widget _buildEmployeeShiftCard(Map<String, dynamic> data, String docID, String status) {
-    // 1. Get the Timestamp from Firestore
-    Timestamp date = data['shiftDate'];
+    // Safe conversion helper
+    DateTime? safeDate(dynamic val) {
+      if (val is Timestamp) return val.toDate();
+      if (val is String) return DateTime.tryParse(val);
+      return null;
+    }
 
-    // 2. Convert to DateTime
-    DateTime dateTime = date.toDate();
+    // Get formatted strings safely
+    DateTime? dateVal = safeDate(data['shiftDate']);
+    DateTime? startVal = safeDate(data['shiftStartTime']);
+    DateTime? endVal = safeDate(data['shiftEndTime']);
 
-    // 3. Format to String
-    String formattedDate = DateFormat('MMMMd').format(dateTime); 
-    // Result: March 18, 2026
+    String dateStr = dateVal != null ? DateFormat('d MMM yyyy, EEEE').format(dateVal) : "No Date";
+    String timeRange = (startVal != null && endVal != null)
+        ? "${DateFormat.jm().format(startVal)} - ${DateFormat.jm().format(endVal)}"
+        : "Time Not Set";
+
     return _buildCard(
       color: Colors.white,
       child: Column(
@@ -254,21 +262,12 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      DateFormat('d MMM yyyy, EEEE').format((data['shiftDate'] as Timestamp).toDate()),
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                    ),
+                    Text(dateStr, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                     const SizedBox(height: 8),
-                    Text(
-                      // Convert both Timestamps to formatted Time Strings
-                      "${DateFormat.jm().format((data['shiftStartTime'] as Timestamp).toDate())} - "
-                      "${DateFormat.jm().format((data['shiftEndTime'] as Timestamp).toDate())}",
-                      style: const TextStyle(fontSize: 15),
-                    ),
+                    Text(timeRange, style: const TextStyle(fontSize: 15)),
                     const SizedBox(height: 8),
-                    Text("Location: ${data['shiftLocation'] ?? 'Workplace'}",
-                        style: const TextStyle(color: Colors.grey)),
-                    if(data['shiftTask'] != null) ...[
+                    Text("Location: ${data['shiftLocation'] ?? 'Workplace'}", style: const TextStyle(color: Colors.grey)),
+                    if (data['shiftTask'] != null) ...[
                       const SizedBox(height: 8),
                       Text("Task: ${data['shiftTask']}", style: const TextStyle(fontStyle: FontStyle.italic)),
                     ]

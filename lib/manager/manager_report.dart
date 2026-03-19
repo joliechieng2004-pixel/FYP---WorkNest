@@ -1,8 +1,7 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:worknest/services/pdf_service.dart';
 
 class ManagerReportPage extends StatefulWidget {
   final String deptCode;
@@ -367,8 +366,38 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
                 // --- Section 3: Absent List ---
                 const Text("Today's Missing Staff", 
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87)),
+                
                 const SizedBox(height: 10),
+                
                 _buildAbsentReportSection(),
+
+                const SizedBox(height: 10),
+
+                // --- Section 4: Export Button ---
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.picture_as_pdf),
+                  label: const Text("Export Department Report", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: bgLightBlue,
+                    foregroundColor: primaryBlue,
+                    side: BorderSide(width: 2, color: primaryBlue),
+                    padding: EdgeInsets.all(20)),
+                  onPressed: () {
+                    if (docs.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("No data available for the selected period.")),
+                      );
+                      return;
+                    }
+                    PdfExportService.exportAttendanceReport(
+                      title: "Department Attendance Report",
+                      docs: docs, // This is the 'docs' variable from your StreamBuilder
+                      period: _selectedPeriod,
+                    );
+                  },
+                ),
+
+                const SizedBox(height: 10),
               ],
             );
           },
