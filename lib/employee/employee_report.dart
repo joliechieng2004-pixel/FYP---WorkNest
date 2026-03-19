@@ -22,19 +22,12 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
 
   String _selectedPeriod = "Weekly";
   List<QueryDocumentSnapshot> _currentDocs = [];
-  Stream<QuerySnapshot>? _attendanceStream;
 
   // --- INITIALIZATION ---
   @override
   void initState() {
     super.initState();
     debugPrint(widget.workerID);
-    _attendanceStream = FirebaseFirestore.instance
-          .collection('attendances')
-          .where('attendanceUserId', isEqualTo: widget.workerID)
-          .where('attendanceDate', isGreaterThanOrEqualTo: Timestamp.fromDate(_getStartDate()))
-          .orderBy('attendanceDate', descending: true)
-          .snapshots();
     }
 
   @override
@@ -46,6 +39,13 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
   // --- BUILD WIDGETS ---
   @override
   Widget build(BuildContext context) {
+    final attendanceStream = FirebaseFirestore.instance
+        .collection('attendances')
+        .where('attendanceUserId', isEqualTo: widget.workerID)
+        .where('attendanceDate', isGreaterThanOrEqualTo: Timestamp.fromDate(_getStartDate()))
+        .orderBy('attendanceDate', descending: true)
+        .snapshots();
+
     return Scaffold(
       backgroundColor: bgLightBlue,
       appBar: AppBar(
@@ -60,22 +60,6 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Shift Summary
-              _buildCard(
-                child: Column(
-                  children: [
-                    const Text(
-                          "Personal Summary",
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                        ),
-                    const Divider(color: Color(0xFF1A3E88)),
-                    _buildStatRow("Attendance Rate", "20"),
-                    _buildStatRow("Punctuality Rate", "20"),
-                    _buildStatRow("Total Absence", "10"),
-                  ],
-                ),
-              ),
-
               _buildPeriodToggle(),
 
               // Leave Requests (Scrollable Version)
@@ -94,13 +78,13 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
                     
                     // Fixed height container to enable internal scrolling
                     SizedBox(
-                      height: 300, // Set the height you want for the scrollable area
+                      height: 400, // Set the height you want for the scrollable area
                       child: Scrollbar(
                         controller: _timesheetScrollController,
                         thumbVisibility: true, // Makes the scrollbar visible like in your design
                         child: // Inside your Leave Requests _buildCard
                           StreamBuilder<QuerySnapshot>(
-                            stream: _attendanceStream,
+                            stream: attendanceStream,
                             builder: (context, snapshot) {
                               if (snapshot.hasError) {
                                 debugPrint("Firestore Error: ${snapshot.error}");
@@ -223,28 +207,6 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
         ],
       ),
       child: child,
-    );
-  }
-
-  // Helper for Summary Rows
-  Widget _buildStatRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          Container(
-            width: 60,
-            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
-            decoration: BoxDecoration(
-              border: Border.all(color: primaryBlue),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(value, textAlign: TextAlign.center, style: const TextStyle(color: Colors.blueGrey, fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
     );
   }
 

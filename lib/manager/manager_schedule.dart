@@ -220,18 +220,58 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
                       child: Scrollbar(
                         controller: _leaveScrollController,
                         thumbVisibility: true, // Makes the scrollbar visible like in your design
-                        child: // Inside your Leave Requests _buildCard
-                          ListView.builder(
-                            controller: _leaveScrollController,
-                            padding: const EdgeInsets.only(right: 10),
-                            itemCount: 5, // Example count
-                            itemBuilder: (context, index) {
-                              return const ExpandableLeaveItem(
-                                title: "Employee Name Here",
-                                reason: "Family emergency, need to travel back to KL.",
+                        child: StreamBuilder<QuerySnapshot>(
+                          // 1. Fetching leave requests specific to this worker
+                          stream: FirebaseFirestore.instance
+                              .collection('leaves')
+                              .where('deptCode', isEqualTo: widget.deptCode) // Using widget.workerID from your class
+                              .orderBy('leaveDate', descending: true)  // Newest requests on top
+                              .snapshots(),
+                          builder: (context, snapshot) {
+                            // 2. Handle Loading & Errors
+                            if (snapshot.hasError) 
+                              print("$snapshot.error");
+                            if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+                              return const Center(child: CircularProgressIndicator());
+                            }
+
+                            final leaveDocs = snapshot.data?.docs ?? [];
+
+                            // 3. Handle Empty State (UX Polish)
+                            if (leaveDocs.isEmpty) {
+                              return const Center(
+                                child: Text("No leave requests found.", 
+                                style: TextStyle(color: Colors.grey))
                               );
-                            },
-                          ),
+                            }
+
+                            // 4. Build the dynamic list
+                            return ListView.builder(
+                              controller: _leaveScrollController,
+                              padding: const EdgeInsets.only(right: 10),
+                              itemCount: leaveDocs.length,
+                              itemBuilder: (context, index) {
+                                var doc = leaveDocs[index];
+                                var data = doc.data() as Map<String, dynamic>;
+                                
+                                // Extract and format data
+                                String status = data['leaveStatus'] ?? "pending";
+                                String reason = data['leaveReason'] ?? "No reason provided";
+                                DateTime date = (data['leaveDate'] as Timestamp).toDate();
+                                String formattedDate = DateFormat('d MMM yyyy, EEE').format(date);
+                                
+                                return ExpandableLeaveItem(
+                                  docId: doc.id,
+                                  title: formattedDate,
+                                  reason: reason,
+                                  status: status,
+                                  isManager: true,
+                                  managerNote: data['managerReason']
+                                );
+                              },
+                            );
+                          },
+                        ),
                       ),
                     ),
                   ],

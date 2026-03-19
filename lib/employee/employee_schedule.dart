@@ -93,8 +93,6 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
                       _isDateSelected = true;
                     });
                     _updateStream(selectedDay);
-                    // TODO: Fetch shifts from Firestore for this specific date!
-                    print("Selected Date: $_selectedDay");
                   },
                   onFormatChanged: (format) {
                     setState(() {
@@ -141,7 +139,54 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
                       child: const Center(child: Text("Select a date to view your shift")),
                     ),
 
-              // 3. Leave Requests (Scrollable Version)
+              // 3. Shift Summary
+              _buildCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "Shift Summary",
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                    const Divider(color: Color(0xFF1A3E88)),
+
+                    // 1. Pending Leaves (from 'leaves' collection)
+                    _buildDynamicStatRow(
+                      label: "Pending Leave",
+                      stream: FirebaseFirestore.instance
+                          .collection('leaves')
+                          .where('leaveUserID', isEqualTo: widget.workerID)
+                          .where('leaveStatus', isEqualTo: 'pending')
+                          .where('leaveDate', isGreaterThanOrEqualTo: Timestamp.fromDate(DateTime.now()))
+                          .snapshots(),
+                    ),
+
+                    // 2. Pending Shifts (from 'shifts' collection)
+                    _buildDynamicStatRow(
+                      label: "Pending Shift",
+                      stream: FirebaseFirestore.instance
+                          .collection('shifts')
+                          .where('shiftUserID', isEqualTo: widget.workerID)
+                          .where('shiftStatus', isEqualTo: 'pending')
+                          .where('shiftDate', isGreaterThanOrEqualTo: Timestamp.fromDate(DateTime.now()))
+                          .snapshots(),
+                    ),
+
+                    // 3. Accepted Shifts
+                    _buildDynamicStatRow(
+                      label: "Upcoming Shift",
+                      stream: FirebaseFirestore.instance
+                          .collection('shifts')
+                          .where('shiftUserID', isEqualTo: widget.workerID)
+                          .where('shiftStatus', isEqualTo: 'accepted')
+                          .where('shiftDate', isGreaterThanOrEqualTo: Timestamp.fromDate(DateTime.now()))
+                          .snapshots(),
+                    ),
+                  ],
+                ),
+              ),
+
+              // 4. Leave Requests (Scrollable Version)
               _buildCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -155,43 +200,65 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
                     const Divider(color: Color(0xFF1A3E88)),
                     const SizedBox(height: 10),
                     
-                    // Fixed height container to enable internal scrolling
                     SizedBox(
-                      height: 300, // Set the height you want for the scrollable area
+                      height: 300, 
                       child: Scrollbar(
                         controller: _leaveScrollController,
-                        thumbVisibility: true, // Makes the scrollbar visible like in your design
-                        child: // Inside your Leave Requests _buildCard
-                          ListView.builder(
-                            controller: _leaveScrollController,
-                            padding: const EdgeInsets.only(right: 10),
-                            itemCount: 5, // Example count
-                            itemBuilder: (context, index) {
-                              return const ExpandableLeaveItem(
-                                title: "Employee Name Here",
-                                reason: "Family emergency, need to travel back to KL.",
+                        thumbVisibility: true, 
+                        child: StreamBuilder<QuerySnapshot>(
+                          // 1. Fetching leave requests specific to this worker
+                          stream: FirebaseFirestore.instance
+                              .collection('leaves')
+                              .where('leaveUserID', isEqualTo: widget.workerID) // Using widget.workerID from your class
+                              .orderBy('leaveDate', descending: true)  // Newest requests on top
+                              .snapshots(),
+                          builder: (context, snapshot) {
+                            // 2. Handle Loading & Errors
+                            if (snapshot.hasError) 
+                              print("$snapshot.error");
+                            if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+                              return const Center(child: CircularProgressIndicator());
+                            }
+
+                            final leaveDocs = snapshot.data?.docs ?? [];
+
+                            // 3. Handle Empty State (UX Polish)
+                            if (leaveDocs.isEmpty) {
+                              return const Center(
+                                child: Text("No leave requests found.", 
+                                style: TextStyle(color: Colors.grey))
                               );
-                            },
-                          ),
+                            }
+
+                            // 4. Build the dynamic list
+                            return ListView.builder(
+                              controller: _leaveScrollController,
+                              padding: const EdgeInsets.only(right: 10),
+                              itemCount: leaveDocs.length,
+                              itemBuilder: (context, index) {
+                                var doc = leaveDocs[index]; // The QueryDocumentSnapshot
+                                var data = doc.data() as Map<String, dynamic>;
+                                
+                                // Extract and format data
+                                String status = data['leaveStatus'] ?? "pending";
+                                String reason = data['leaveReason'] ?? "No reason provided";
+                                DateTime date = (data['leaveDate'] as Timestamp).toDate();
+                                String formattedDate = DateFormat('d MMM yyyy, EEE').format(date);
+                                
+                                return ExpandableLeaveItem(
+                                  docId: doc.id,
+                                  title: formattedDate,
+                                  reason: reason,
+                                  status: status,
+                                  isManager: false,
+                                  managerNote: data['managerReason']
+                                );
+                              },
+                            );
+                          },
+                        ),
                       ),
                     ),
-                  ],
-                ),
-              ),
-
-              // 4. Shift Summary
-              _buildCard(
-                child: Column(
-                  children: [
-                    const Text(
-                          "Shift Summary",
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                        ),
-                    const Divider(color: Color(0xFF1A3E88)),
-                    _buildStatRow("Pending Leave", "20"),
-                    _buildStatRow("Pending Shift", "20"),
-                    _buildStatRow("Accepted Shift", "10"),
-                    _buildStatRow("Rejected Shift", "10"),
                   ],
                 ),
               ),
@@ -285,10 +352,7 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
                       const Icon(Icons.check_circle, color: Colors.green, size: 40)
                     
                     else if (status == 'rejected') ...[
-                      // 2. If rejected, buttons are disabled, Reject is filled
-                      _buildActionButton("Accept", Colors.green, () {}, false, isDisabled: true),
-                      const SizedBox(height: 10),
-                      _buildActionButton("Reject", Colors.red, () {}, true, isDisabled: true),
+                      const Icon(Icons.cancel, color: Colors.red, size: 40)
                     ] 
                     
                     else ...[
@@ -403,7 +467,7 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text("Confirm ${newStatus[0].toUpperCase()}${newStatus.substring(1)}"),
-        content: Text("Are you sure you want to $newStatus this shift? This action may be permanent."),
+        content: Text("Your action to $newStatus this shift may be permanent."),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -463,9 +527,8 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text("Date: ${DateFormat('dd MMM yyyy').format(_selectedDay!)}"),
+                Text(DateFormat('dd MMM yyyy').format(_selectedDay!), style: const TextStyle(fontSize: 14)),
                 const SizedBox(height: 20),
-
                 TextField(
                   controller: _leaveController,
                   decoration: InputDecoration(
@@ -490,14 +553,39 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
                 );
                 return;
               }
-                // Mapping your local variables to the function parameters
-                await _submitLeaveToFirestore(
-                  workerID: widget.workerID, 
-                  leaveReason: _leaveController.text
-                );
-                
-                if (mounted) Navigator.pop(context);
-                _leaveController.clear();
+                try {
+                  // 1. Fetch workerName from users collection
+                  DocumentSnapshot userDoc = await FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(widget.workerID)
+                      .get();
+
+                  Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
+                  String fullName = "${userData['userFName']} ${userData['userLName']}";
+
+                  // 2. Submit with all fields
+                  await _submitLeaveToFirestore(
+                    deptCode: widget.deptCode,
+                    workerID: widget.workerID,
+                    workerName: fullName,
+                    leaveReason: _leaveController.text,
+                  );
+
+                  if (mounted) {
+                    Navigator.pop(context);
+                    _leaveController.clear();
+                    // Show success feedback
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("Leave request submitted!"),
+                        duration: Duration(seconds: 1),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  print("Error submitting leave: $e");
+                }
               },
               style: ElevatedButton.styleFrom(backgroundColor: primaryBlue, foregroundColor: Colors.white),
               child: const Text("Confirm"),
@@ -510,37 +598,79 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
 
   // Feature - Submit Leave
   Future<void> _submitLeaveToFirestore({
+    required String deptCode,
     required String workerID,
+    required String workerName,
     required String leaveReason,
   }) async {
-    await FirebaseFirestore.instance.collection('leaves').add({
-      'leaveDate': Timestamp.fromDate(_selectedDay!), 
-      'leaveReason': leaveReason,
-      'leaveStatus': 'pending',
-      'leaveUserID': workerID,
-      'managerReason': null,
-    });
+    // 1. Create a unique document ID (e.g., "2026-03-19_worker123")
+    String dateString = DateFormat('yyyy-MM-dd').format(_selectedDay!);
+    String customDocId = "${dateString}_$workerID";
+
+    try {
+      // 2. Use .doc(customDocId).set() instead of .add()
+      await FirebaseFirestore.instance
+          .collection('leaves')
+          .doc(customDocId) 
+          .set({
+        'deptCode': deptCode,
+        'leaveUserID': workerID,
+        'leaveUserName': workerName,
+        'leaveDate': Timestamp.fromDate(_selectedDay!),
+        'leaveReason': leaveReason,
+        'leaveStatus': 'pending',
+        'leaveAppliedDate': FieldValue.serverTimestamp(), // Fixed typo from 'Datte'
+        'managerReason': null,
+      }, SetOptions(merge: true)); // Use merge to avoid wiping out other fields if they exist
+
+      print("Leave submitted with ID: $customDocId");
+    } catch (e) {
+      print("Error submitting leave: $e");
+      throw e; // Pass error back to the UI to show a SnackBar
+    }
   }
 
   // Helper for Summary Rows
-  Widget _buildStatRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          Container(
-            width: 60,
-            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
-            decoration: BoxDecoration(
-              border: Border.all(color: primaryBlue),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(value, textAlign: TextAlign.center, style: const TextStyle(color: Colors.blueGrey, fontWeight: FontWeight.bold)),
+  Widget _buildDynamicStatRow({required String label, required Stream<QuerySnapshot> stream}) {
+    return StreamBuilder<QuerySnapshot>(
+      stream: stream,
+      builder: (context, snapshot) {
+        // Show "0" or "..." while loading
+        String value = snapshot.hasData ? snapshot.data!.docs.length.toString() : "0";
+        print(snapshot.error);
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(vertical: 5),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+              Container(
+                width: 50,
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                decoration: BoxDecoration(
+                  // Highlight red if there are pending actions
+                  color: (label.contains("Pending") && value != "0") 
+                      ? Colors.red.shade50 
+                      : Colors.transparent,
+                  border: Border.all(color: primaryBlue.withOpacity(0.5)),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  value,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: (label.contains("Pending") && value != "0") 
+                        ? Colors.red 
+                        : primaryBlue,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 

@@ -20,23 +20,27 @@ class EmployeeHome extends StatefulWidget {
 }
 
 class _EmployeeHomePageState extends State<EmployeeHome> {
-  // often use colors
+  // --- DECLARATION ---
+  // color
   final Color primaryBlue = const Color.fromARGB(255, 40, 75, 158);
   final Color bgLightBlue = const Color.fromARGB(255, 240, 250, 255);
 
+  // navigation data
+  int _selectedIndex = 0;
+
+  // timer
   bool _isClockedIn = false;
   DateTime? _startTime;
   String _workingHours = "00:00:00";
   Timer? _timer;
   bool _isLoading = true;
 
-  // for navigation
-  int _selectedIndex = 0;
+  final ScrollController _shiftScrollController = ScrollController();
 
+  // clock in service
   final AuthService _authService = AuthService();
 
-  final ScrollController _activityScrollController = ScrollController();
-
+  // clock in data
   double officeLat = 0.0;
   double officeLng = 0.0;
   double officeRadius = 0.0;
@@ -45,11 +49,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
   String workerID = "Worker ID";
   String formattedDate = DateFormat('EEEE, d MMM yyyy').format(DateTime.now());
   String formattedTime = DateFormat('h:mm a').format(DateTime.now());
-  
-  // Example: Coordinates for your office
-  // TODO: change to manager provided location
-  // TODO: let manager provide radius allowed
-  final double maxDistanceInMeters = 100.0; // The radius allowed (m)
+
 
   // --- INITIALIZATION ---
   @override
@@ -69,16 +69,16 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
   @override
   void dispose() {
     _timer?.cancel();
-    _activityScrollController.dispose(); // Clean up the controller
+    _shiftScrollController.dispose(); // Clean up the controller
     super.dispose(); 
   }
 
-  // Fetch the current employee's department details
+  // Fetch Employee Data
   Future<void> _loadEmployeeData() async {
     User? user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       try {
-        // 1. Fetch User Profile to get the deptCode
+        // Get Dept Code
         DocumentSnapshot userDoc = await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
@@ -93,7 +93,6 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
             lName = userDoc['userLName'];
           });
 
-          // 2. Now fetch the Office Location using the fetchedDeptCode
           await _fetchOfficeCoordinates(fetchedDeptCode);
         }
       } catch (e) {
@@ -102,7 +101,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
     }
   }
 
-  // Separate helper function to keep your code clean
+  // Fetch Office Data
   Future<void> _fetchOfficeCoordinates(String code) async {
     try {
       DocumentSnapshot deptDoc = await FirebaseFirestore.instance
@@ -116,12 +115,10 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
         
         if (settings != null) {
           GeoPoint? geoPoint = settings['officeLocation'];
-          // Use a default radius if the value is missing or null
           double radiusMeter = (settings['radiusMeter'] ?? 100.0).toDouble();
 
           setState(() {
             if (geoPoint != null) {
-              // These are the variables your Clock-In logic uses
               officeLat = geoPoint.latitude; 
               officeLng = geoPoint.longitude;
               officeRadius = radiusMeter;
@@ -135,6 +132,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
     }
   }
 
+  // Ensure Data Persistency
   Future<void>  _checkCurrentAttendanceStatus() async {
     User? user = FirebaseAuth.instance.currentUser;
     if (user != null) {
@@ -175,7 +173,8 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
       );
     }
     
-    // 1. Define the pages
+    // Bottom Navigation
+      // pages
     final List<Widget> pages = [
       _buildHomeDashboard(context),                               // Index 0 - Home Page
       EmployeeSchedule(deptCode: deptCode, workerID: workerID),   // Index 1 - Schedule Page
@@ -185,13 +184,12 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
 
     return Scaffold(
       backgroundColor: bgLightBlue,
-      // 2. Switches body based on the index
       body: IndexedStack(
         index: _selectedIndex,
         children: pages,
       ),
 
-      // 3. Fixed Bottom Navigation Bar
+        // styles
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed, // Required for 5 items
         backgroundColor: const Color(0xFF1A3E88), // Dark Blue
@@ -216,6 +214,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
     );
   }
 
+  // Home Dashboard
   SafeArea _buildHomeDashboard(BuildContext context) {
     return SafeArea(
       child: SingleChildScrollView(
@@ -223,7 +222,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // --- Top Greeting Row ---
+            // Greeting Row + Log Out Button
             Row(
               children: [
                 Expanded(
@@ -237,24 +236,23 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
                   flex: 1,
                   child: IconButton.outlined(
                     icon: Icon(Icons.logout, color: primaryBlue),
-                    onPressed: () {
-                      FirebaseAuth.instance.signOut();
-                      Navigator.pushReplacementNamed(context, '/login');
-                    },
+                    onPressed: _showLogoutConfirmation
                   ),
                 ),
               ]),
 
             const SizedBox(height: 10),
 
-            // 2. Clock In Card
+            // Clock In Card
             _buildCard(
               child: Column(
                 children: [
                   if (! _isClockedIn)...[
                     Text(formattedDate, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                     Text(formattedTime, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
+                    
                     const SizedBox(height: 5),
+                    
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFF00C2A0), // Teal Green
@@ -274,7 +272,9 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
                       ],
                     ),
                     Text(_workingHours, style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, letterSpacing: 2, color: Color(0xFF00C2A0)),),
+
                     const SizedBox(height: 5),
+                    
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFE53935 ), // Teal Green
@@ -290,52 +290,133 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
               ),
             ),
 
-            // 3. Shift Summary (Updated to Weekly Slider Form)
             _buildCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+              child: StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('shifts')
+                    .where('shiftUserID', isEqualTo: workerID)
+                    .where('shiftStatus', isEqualTo: 'pending') // Only count those needing action
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  // 1. Handle Loading State
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: LinearProgressIndicator());
+                  }
+
+                  // 2. Get the Count
+                  int pendingCount = snapshot.data?.docs.length ?? 0;
+
+                  return Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text("Weekly Schedule", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                       Row(
                         children: [
-                          Icon(Icons.chevron_left, color: primaryBlue),
-                          Icon(Icons.chevron_right, color: primaryBlue),
+                          Icon(Icons.notification_important, 
+                              color: pendingCount > 0 ? Colors.orange : Colors.grey),
+                          const SizedBox(width: 10),
+                          const Text(
+                            "Pending Shifts",
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
                         ],
-                      )
+                      ),
+                      // 3. Highlight the number if it's > 0
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: pendingCount > 0 ? Colors.orange.shade900 : Colors.grey.shade600,)
+                        ),
+                        child: Text(
+                          "$pendingCount",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: pendingCount > 0 ? Colors.orange.shade900 : Colors.grey.shade600,
+                          ),
+                        ),
+                      ),
                     ],
-                  ),
-                  const Divider(),
-                  const SizedBox(height: 10),
-                  
-                  // Horizontal Scrollable Shift Cards
-                  SizedBox(
-                    height: 120, 
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      children: [
-                        _buildShiftScheduleCard("13 Sept 2025, Sat", "8:00 am - 5:00 pm", "Workplace"),
-                        _buildShiftScheduleCard("15 Sept 2025, Mon", "9:00 am - 6:00 pm", "Workplace"),
-                        _buildShiftScheduleCard("20 Sept 2025, Sat", "8:00 am - 5:00 pm", "Workplace"),
-                      ],
-                    ),
-                  ),
-                ],
+                  );
+                },
               ),
             ),
 
-            // 4. NEW: Upcoming Shift Preview
+            // Shift Summary
             _buildCard(
-              child: const Column(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Text("Next Shift", style: TextStyle(fontWeight: FontWeight.bold)),
-                  SizedBox(height: 10),
-                  ListTile(
-                    leading: Icon(Icons.event, color: Colors.blue),
-                    title: Text("Monday, 9 March"),
-                    subtitle: Text("09:00 AM - 05:00 PM"),
+                  const Text(
+                    "Upcoming Shifts",
+                    style: TextStyle(
+                      fontSize: 18, 
+                      fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.center),
+
+                  Divider(color: primaryBlue),
+
+                  const SizedBox(height: 10),
+                  
+                  SizedBox(
+                    height: 300, // Set the height you want for the scrollable area
+                    child: StreamBuilder<QuerySnapshot>(
+                      stream: FirebaseFirestore.instance
+                          .collection('shifts')
+                          .where('shiftUserID', isEqualTo: workerID)
+                          .where('shiftDate', isGreaterThanOrEqualTo: Timestamp.fromDate(DateTime.now()))
+                          .where('shiftStatus', isEqualTo: "accepted")
+                          .orderBy('shiftDate')
+                          .limit(7)
+                          .snapshots(),
+                      builder: (context, snapshot) {
+                        if (snapshot.hasError) {
+                          debugPrint("Firestore Error: ${snapshot.error}");
+                          return const Center(child: Text("Error loading data"));
+                        }
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(child: CircularProgressIndicator());
+                        }
+                    
+                        var shifts = snapshot.data!.docs;
+
+                        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                          return const Center(child: Text("No upcoming shifts."));
+                        }
+                    
+                        return ListView.separated(
+                          scrollDirection: Axis.vertical,
+                          shrinkWrap: true,
+                          padding: const EdgeInsets.only(right: 10),
+                          itemCount: shifts.length,
+                          separatorBuilder: (context, index) => Divider(color: bgLightBlue,),
+                          itemBuilder: (context, index) {
+                            var data = shifts[index].data() as Map<String, dynamic>;
+                    
+                            DateTime? safeConvertToDateTime(dynamic value) {
+                              if (value == null) return null;
+                              if (value is Timestamp) return value.toDate();
+                              if (value is String) return DateTime.tryParse(value);
+                              return null;
+                            }
+                    
+                            // 1. Convert safely using the helper
+                            DateTime? start = safeConvertToDateTime(data['shiftStartTime']);
+                            DateTime? end = safeConvertToDateTime(data['shiftEndTime']);
+                            DateTime? date = safeConvertToDateTime(data['shiftDate']);
+                    
+                            // 2. Format Strings
+                            String formattedDate = date != null ? DateFormat('d MMM yyyy, EEEE').format(date) : "--";
+                            String formattedIn = start != null ? DateFormat('hh:mm a').format(start) : "--:--";
+                            String formattedOut = end != null ? DateFormat('hh:mm a').format(end) : "--:--";
+                    
+                            return _buildShiftScheduleCard(
+                              formattedDate, formattedIn, formattedOut, "Office"
+                            );
+                          },
+                        );
+                      },
+                    ),
                   ),
                 ],
               ),
@@ -588,9 +669,9 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
     });
   }
 
-  Widget _buildShiftScheduleCard(String date, String time, String location) {
+  Widget _buildShiftScheduleCard(String date, String clockIn, String clockOut, String location) {
     return Container(
-      width: 250, // Fixed width for horizontal scrolling
+      width: double.infinity, // Fixed width for horizontal scrolling
       margin: const EdgeInsets.only(right: 15),
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
@@ -604,7 +685,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
         children: [
           Text(date, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           const SizedBox(height: 5),
-          Text(time, style: const TextStyle(color: Colors.black87)),
+          Text("Shift Time: $clockIn - $clockOut", style: const TextStyle(color: Colors.black87)),
           const SizedBox(height: 5),
           Text("Location: $location", style: const TextStyle(color: Colors.black87)),
         ],
@@ -632,5 +713,49 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
         ],
       ),
     ) ?? false;
+  }
+
+  void _showLogoutConfirmation() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              Icon(Icons.logout, color: primaryBlue),
+              const SizedBox(width: 10),
+              const Text("Confirm Logout"),
+            ],
+          ),
+          content: const Text("Are you sure you want to log out of WorkNest?"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Stay", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red.shade400,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () async {
+                Navigator.pop(context); // Close dialog
+                
+                // Final clean up before logout
+                _timer?.cancel(); 
+                
+                await FirebaseAuth.instance.signOut();
+                if (mounted) {
+                  Navigator.pushReplacementNamed(context, '/login');
+                }
+              },
+              child: const Text("Logout"),
+            ),
+          ],
+        );
+      },
+    );
   }
 }

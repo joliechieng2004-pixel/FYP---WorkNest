@@ -396,8 +396,6 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
                     );
                   },
                 ),
-
-                const SizedBox(height: 10),
               ],
             );
           },
