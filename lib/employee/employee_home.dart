@@ -9,6 +9,7 @@ import 'package:worknest/employee/employee_report.dart';
 import 'package:worknest/employee/employee_schedule.dart';
 import 'package:worknest/services/auth_service.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:worknest/services/auth_wrapper.dart';
 import 'package:worknest/services/location_service.dart';
 import 'package:worknest/widget/face_verification.dart';
 
@@ -36,6 +37,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
   bool _isLoading = true;
 
   final ScrollController _shiftScrollController = ScrollController();
+  final ScrollController _mainScrollController = ScrollController();
 
   // clock in service
   final AuthService _authService = AuthService();
@@ -69,6 +71,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
   @override
   void dispose() {
     _timer?.cancel();
+    _mainScrollController.dispose();
     _shiftScrollController.dispose(); // Clean up the controller
     super.dispose(); 
   }
@@ -164,6 +167,13 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
     }
   }
 
+  DateTime? safeConvertToDateTime(dynamic value) {
+    if (value == null) return null;
+    if (value is Timestamp) return value.toDate();
+    if (value is String) return DateTime.tryParse(value);
+    return null;
+  }
+
   // --- BUILD WIDGETS ---
   @override
   Widget build(BuildContext context) {
@@ -218,6 +228,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
   SafeArea _buildHomeDashboard(BuildContext context) {
     return SafeArea(
       child: SingleChildScrollView(
+        controller: _mainScrollController,
         padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
@@ -383,37 +394,39 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
                         if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
                           return const Center(child: Text("No upcoming shifts."));
                         }
+
+                        if (shifts.isEmpty) {
+                          return const Center(child: Text("No upcoming shifts."));
+                        }
                     
-                        return ListView.separated(
-                          scrollDirection: Axis.vertical,
-                          shrinkWrap: true,
-                          padding: const EdgeInsets.only(right: 10),
-                          itemCount: shifts.length,
-                          separatorBuilder: (context, index) => Divider(color: bgLightBlue,),
-                          itemBuilder: (context, index) {
-                            var data = shifts[index].data() as Map<String, dynamic>;
-                    
-                            DateTime? safeConvertToDateTime(dynamic value) {
-                              if (value == null) return null;
-                              if (value is Timestamp) return value.toDate();
-                              if (value is String) return DateTime.tryParse(value);
-                              return null;
-                            }
-                    
-                            // 1. Convert safely using the helper
-                            DateTime? start = safeConvertToDateTime(data['shiftStartTime']);
-                            DateTime? end = safeConvertToDateTime(data['shiftEndTime']);
-                            DateTime? date = safeConvertToDateTime(data['shiftDate']);
-                    
-                            // 2. Format Strings
-                            String formattedDate = date != null ? DateFormat('d MMM yyyy, EEEE').format(date) : "--";
-                            String formattedIn = start != null ? DateFormat('hh:mm a').format(start) : "--:--";
-                            String formattedOut = end != null ? DateFormat('hh:mm a').format(end) : "--:--";
-                    
-                            return _buildShiftScheduleCard(
-                              formattedDate, formattedIn, formattedOut, "Office"
-                            );
-                          },
+                        return Scrollbar(
+                          controller: _shiftScrollController,
+                          thumbVisibility: true,
+                          child: ListView.separated(
+                            controller: _shiftScrollController,
+                            primary: false,
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.only(right: 10),
+                            itemCount: shifts.length,
+                            separatorBuilder: (context, index) => Divider(color: bgLightBlue,),
+                            itemBuilder: (context, index) {
+                              var data = shifts[index].data() as Map<String, dynamic>;
+                
+                              // 1. Convert safely using the helper
+                              DateTime? start = safeConvertToDateTime(data['shiftStartTime']);
+                              DateTime? end = safeConvertToDateTime(data['shiftEndTime']);
+                              DateTime? date = safeConvertToDateTime(data['shiftDate']);
+                                              
+                              // 2. Format Strings
+                              String formattedDate = date != null ? DateFormat('d MMM yyyy, EEEE').format(date) : "--";
+                              String formattedIn = start != null ? DateFormat('hh:mm a').format(start) : "--:--";
+                              String formattedOut = end != null ? DateFormat('hh:mm a').format(end) : "--:--";
+                                              
+                              return _buildShiftScheduleCard(
+                                formattedDate, formattedIn, formattedOut, "Office"
+                              );
+                            },
+                          ),
                         );
                       },
                     ),
@@ -748,7 +761,11 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
                 
                 await FirebaseAuth.instance.signOut();
                 if (mounted) {
-                  Navigator.pushReplacementNamed(context, '/login');
+                  // This clears the entire history so the app "starts over"
+                  Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (context) => const AuthWrapper()),
+                    (Route<dynamic> route) => false,
+                  );
                 }
               },
               child: const Text("Logout"),

@@ -4,6 +4,7 @@ import 'package:worknest/employee/employee_home.dart';
 import 'package:worknest/login.dart';
 import 'package:worknest/manager/manager_home.dart';
 import 'package:worknest/register.dart';
+import 'package:worknest/services/auth_wrapper.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -27,7 +28,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: ThemeData(fontFamily: 'Roboto'),
-      initialRoute: '/login',
+      home: const AuthWrapper(),
       routes: {
         '/login': (context) => const LoginPage(), // Make sure this line exists!
         '/register': (context) => const RegisterPage(),

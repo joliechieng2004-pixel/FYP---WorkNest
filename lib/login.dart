@@ -199,11 +199,7 @@ class _LoginPageState extends State<LoginPage> {
 
   if (result == null) {
      // Success! Navigate based on the radio button value
-     if (selectedRole == 'manager') {
-       Navigator.pushReplacementNamed(context, '/manager_home');
-     } else {
-       Navigator.pushReplacementNamed(context, '/employee_home');
-     }
+     debugPrint("Login successful. Waiting for AuthWrapper to switch...");
   } else {
      // Show error from SnackBar
      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result)));

@@ -33,6 +33,8 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
   final TextEditingController _taskController = TextEditingController();
 
   final ScrollController _leaveScrollController = ScrollController();
+  final ScrollController _mainScrollController = ScrollController();
+
   String deptCode = "Loading...";
   String formattedDate = DateFormat('EEEE, d MMM yyyy').format(DateTime.now());
   String formattedTime = DateFormat('h:mm a').format(DateTime.now());
@@ -61,6 +63,7 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
   @override
   void dispose() {
     _leaveScrollController.dispose(); // Clean up the controller
+    _mainScrollController.dispose();
     super.dispose(); 
   }
 
@@ -77,6 +80,7 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
       ),
       body: SafeArea(
         child: SingleChildScrollView(
+          controller: _mainScrollController,
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
@@ -217,37 +221,38 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
                     // Fixed height container to enable internal scrolling
                     SizedBox(
                       height: 300, // Set the height you want for the scrollable area
-                      child: Scrollbar(
-                        controller: _leaveScrollController,
-                        thumbVisibility: true, // Makes the scrollbar visible like in your design
-                        child: StreamBuilder<QuerySnapshot>(
-                          // 1. Fetching leave requests specific to this worker
-                          stream: FirebaseFirestore.instance
-                              .collection('leaves')
-                              .where('deptCode', isEqualTo: widget.deptCode) // Using widget.workerID from your class
-                              .orderBy('leaveDate', descending: true)  // Newest requests on top
-                              .snapshots(),
-                          builder: (context, snapshot) {
-                            // 2. Handle Loading & Errors
-                            if (snapshot.hasError) 
-                              print("$snapshot.error");
-                            if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-                              return const Center(child: CircularProgressIndicator());
-                            }
-
-                            final leaveDocs = snapshot.data?.docs ?? [];
-
-                            // 3. Handle Empty State (UX Polish)
-                            if (leaveDocs.isEmpty) {
-                              return const Center(
-                                child: Text("No leave requests found.", 
-                                style: TextStyle(color: Colors.grey))
-                              );
-                            }
-
-                            // 4. Build the dynamic list
-                            return ListView.builder(
+                      child: StreamBuilder<QuerySnapshot>(
+                        // 1. Fetching leave requests specific to this worker
+                        stream: FirebaseFirestore.instance
+                            .collection('leaves')
+                            .where('deptCode', isEqualTo: widget.deptCode) // Using widget.workerID from your class
+                            .orderBy('leaveDate', descending: true)  // Newest requests on top
+                            .snapshots(),
+                        builder: (context, snapshot) {
+                          // 2. Handle Loading & Errors
+                          if (snapshot.hasError) 
+                            print("$snapshot.error");
+                          if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
+                            return const Center(child: CircularProgressIndicator());
+                          }
+                      
+                          final leaveDocs = snapshot.data?.docs ?? [];
+                      
+                          // 3. Handle Empty State (UX Polish)
+                          if (leaveDocs.isEmpty) {
+                            return const Center(
+                              child: Text("No leave requests found.", 
+                              style: TextStyle(color: Colors.grey))
+                            );
+                          }
+                      
+                          // 4. Build the dynamic list
+                          return Scrollbar(
+                            controller: _leaveScrollController,
+                            thumbVisibility: true,
+                            child: ListView.builder(
                               controller: _leaveScrollController,
+                              primary: false,
                               padding: const EdgeInsets.only(right: 10),
                               itemCount: leaveDocs.length,
                               itemBuilder: (context, index) {
@@ -269,9 +274,9 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
                                   managerNote: data['managerReason']
                                 );
                               },
-                            );
-                          },
-                        ),
+                            ),
+                          );
+                        },
                       ),
                     ),
                   ],

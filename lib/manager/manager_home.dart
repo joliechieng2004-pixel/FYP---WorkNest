@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:worknest/manager/manager_profile.dart';
 import 'package:worknest/manager/manager_report.dart';
 import 'package:worknest/manager/manager_schedule.dart';
+import 'package:worknest/services/auth_wrapper.dart';
 import 'manager_employee.dart';
 
 class ManagerHome extends StatefulWidget {
@@ -141,10 +142,7 @@ class _ManagerHomePageState extends State<ManagerHome> {
                   flex: 1,
                   child: IconButton.outlined(
                     icon: Icon(Icons.logout, color: primaryBlue),
-                    onPressed: () {
-                      FirebaseAuth.instance.signOut();
-                      Navigator.pushReplacementNamed(context, '/login');
-                    },
+                    onPressed: _showLogoutConfirmation
                   ),
                 ),
               ]),
@@ -406,6 +404,50 @@ class _ManagerHomePageState extends State<ManagerHome> {
                 ),
             ],
           ),
+        );
+      },
+    );
+  }
+
+  void _showLogoutConfirmation() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              Icon(Icons.logout, color: primaryBlue),
+              const SizedBox(width: 10),
+              const Text("Confirm Logout"),
+            ],
+          ),
+          content: const Text("Are you sure you want to log out of WorkNest?"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Stay", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red.shade400,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              onPressed: () async {
+                Navigator.pop(context); // Close dialog
+                await FirebaseAuth.instance.signOut();
+                if (mounted) {
+                  // This clears the entire history so the app "starts over"
+                  Navigator.of(context, rootNavigator: true).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (context) => const AuthWrapper()),
+                    (Route<dynamic> route) => false,
+                  );
+                }
+              },
+              child: const Text("Logout"),
+            ),
+          ],
         );
       },
     );

@@ -133,41 +133,6 @@ class AuthService {
     return 'Employee creation failed';
   }
 
-  // TODO: create employee in employee page
-  // // 3. CREATE EMPLOYEE (Inside Manager Dashboard)
-  // Future<String?> createEmployeeByManager({
-  //   required String email,
-  //   required String password,
-  //   required String fName,
-  //   required String lName,
-  //   required String contact,
-  //   required String managerDeptCode, // Passed from Manager's current data
-  // }) async {
-  //   try {
-  //     // Create the Employee's Auth Account
-  //     UserCredential result = await _auth.createUserWithEmailAndPassword(
-  //       email: email,
-  //       password: password,
-  //     );
-
-  //     if (result.user != null) {
-  //       await _db.collection('users').doc(result.user!.uid).set({
-  //         'userFName': fName,
-  //         'userLName': lName,
-  //         'userEmail': email,
-  //         'userContact': contact,
-  //         'userRole': 'employee', // Hardcoded as Employee
-  //         'deptCode': managerDeptCode,
-  //         'createdAt': FieldValue.serverTimestamp(),
-  //       });
-  //       return null;
-  //     }
-  //   } on FirebaseAuthException catch (e) {
-  //     return e.message;
-  //   }
-  //   return 'Employee creation failed';
-  // }
-
   // 4. LOGIN USER WITH DEPT CODE VERIFICATION
   // Change the return type from Map? to String?
   Future<String?> loginUser({

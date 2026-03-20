@@ -236,10 +236,10 @@ class _RegisterPageState extends State<RegisterPage> {
       // SUCCESS!
       ScaffoldMessenger.of(context).showSnackBar(
         // TODO: change duration for better experience
-        const SnackBar(content: Text("Account Created Successfully!")),
+        const SnackBar(content: Text("Account Created Successfully!"), backgroundColor: Colors.green,),
       );
       // Navigate to Login or Dashboard
-      Navigator.pushReplacementNamed(context, '/login'); 
+      Navigator.pushReplacementNamed(context, '/manager_home');
     } else {
       // ERROR (e.g., email already in use)
       ScaffoldMessenger.of(context).showSnackBar(
