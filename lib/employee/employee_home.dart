@@ -554,22 +554,47 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
     }
   }
 
-  // --- Clock Out ---
+  // --- CLOCK OUT LOGIC (Handles Rule 3) ---
   void _clockOutLogic() async {
     User? user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
     try {
-      // Show loading while talking to Firebase
+      // Show loading while verifying location and talking to Firebase
       showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => const Center(child: CircularProgressIndicator()));
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator())
+      );
 
-      // Call the new service function
+      // Rule 3: Verify Location Again
+      bool hasPermission = await LocationService.handleLocationPermission();
+      if (!hasPermission) {
+        if (mounted) Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Location permissions denied."), backgroundColor: Colors.red));
+        return;
+      }
+
+      Position position = await _getCurrentLocation() ?? await Geolocator.getCurrentPosition();
+      double distanceInMeters = LocationService.getDistance(
+        position.latitude,
+        position.longitude,
+        officeLat,
+        officeLng
+      );
+
+      if (distanceInMeters > officeRadius) {
+        if (mounted) Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Too far to clock out: ${distanceInMeters.toInt()}m away."), backgroundColor: Colors.red)
+        );
+        return;
+      }
+
+      // Call the backend service function
       String? error = await _authService.clockOutUser(uid: user.uid);
 
-      Navigator.pop(context); // Close loading
+      if (mounted) Navigator.pop(context); // Close loading
 
       if (error == null) {
         _timer?.cancel();
@@ -582,36 +607,98 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
         });
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Clock-out recorded in Firebase!"), backgroundColor: Colors.orange),
+          const SnackBar(content: Text("Clock-out recorded successfully!"), backgroundColor: Colors.green),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
       }
     } catch (e) {
-      if (Navigator.canPop(context)) Navigator.pop(context);
+      if (mounted && Navigator.canPop(context)) Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
     }
   }
 
-  // This handles the UI pop-up
-  void _showClockOutConfirmation() {
+  // --- CLOCK OUT CONFIRMATION (Handles Rules 1 & 2) ---
+  void _showClockOutConfirmation() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    // Rule 1: Minimum 15 minutes attendance duration
+    if (_startTime != null) {
+      int workedMinutes = DateTime.now().difference(_startTime!).inMinutes;
+      if (workedMinutes < 15) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("You must work for at least 15 minutes before clocking out. ($workedMinutes/15 min)"),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return; // Stop the process here
+      }
+    }
+
+    // Show a loading spinner while we check Firestore for the shift end time
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    bool isEarlyLeave = false;
+
+    try {
+      // Rule 2: Check if clocking out before Scheduled End Time
+      String dateId = DateFormat('yyyy-MM-dd').format(DateTime.now());
+      String docId = "${dateId}_${user.uid}";
+      
+      DocumentSnapshot attDoc = await FirebaseFirestore.instance.collection('attendances').doc(docId).get();
+
+      // If an attendance record exists and it is linked to a specific shift
+      if (attDoc.exists && (attDoc.data() as Map<String, dynamic>).containsKey('shiftID') && attDoc['shiftID'] != null) {
+        DocumentSnapshot shiftDoc = await FirebaseFirestore.instance.collection('shifts').doc(attDoc['shiftID']).get();
+        
+        if (shiftDoc.exists) {
+          DateTime shiftEndTime = (shiftDoc['shiftEndTime'] as Timestamp).toDate();
+          // Compare current time to the scheduled end time
+          if (DateTime.now().isBefore(shiftEndTime)) {
+            isEarlyLeave = true;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Error checking shift time: $e");
+    }
+
+    // Close the loading spinner
+    if (mounted) Navigator.pop(context);
+
+    // Set dynamic text and colors based on the early leave status
+    String dialogTitle = isEarlyLeave ? "Early Clock Out Warning" : "Confirm Clock Out";
+    String dialogContent = isEarlyLeave 
+        ? "You haven't reached your scheduled shift end time yet. Are you sure you want to clock out early?"
+        : "Are you sure you want to end your shift?";
+    Color confirmButtonColor = isEarlyLeave ? Colors.red : Colors.white;
+    Color confirmTextColor = isEarlyLeave ? Colors.white : Colors.black;
+
+    // Show the actual confirmation dialog
+    if (!mounted) return;
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text("Confirm Clock Out", style: TextStyle(fontWeight:FontWeight(5)),),
-          content: const Text("Are you sure you want to end your shift?"),
+          title: Text(dialogTitle, style: const TextStyle(fontWeight: FontWeight.bold)),
+          content: Text(dialogContent),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text("Cancel", style: TextStyle(color: Colors.black),),
+              child: const Text("Cancel", style: TextStyle(color: Colors.black)),
             ),
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(context); // Close dialog
-                _clockOutLogic();       // Run the reset logic
+                _clockOutLogic();       // Proceed to location check and backend
               },
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black),
+              style: ElevatedButton.styleFrom(backgroundColor: confirmButtonColor, foregroundColor: confirmTextColor),
               child: const Text("Confirm"),
             ),
           ],

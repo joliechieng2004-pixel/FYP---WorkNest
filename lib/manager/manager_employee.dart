@@ -224,7 +224,7 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
       builder: (BuildContext context) {
         return AlertDialog(
           title: const Text("Confirm Clock Out", style: TextStyle(fontWeight:FontWeight(5)),),
-          content: const Text("Are you sure you want to end your shift?"),
+          content: const Text("Are you sure you want to remove the employee?"),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
@@ -336,74 +336,58 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
     );
   }
 
-  // Future<String?> _registerWorkerInFirestore({
-  //   required String fname,
-  //   required String lname,
-  //   required String email,
-  //   required String contact,
-  //   required String password,
-  // }) async {
-  //   try {
-  //     // Note: In a production app, you'd use Firebase Auth to create the account.
-  //     // For now, we create a user document that the worker can 'claim' or log into.
-  //     await FirebaseFirestore.instance.collection('users').add({
-  //       'userFName': fname,
-  //       'userLName': lname,
-  //       'email': email,
-  //       'contact': contact,
-  //       'password': password, // Ideally, don't store plain text passwords in production!
-  //       'deptCode': widget.deptCode, // Pass from the manager
-  //       'role': 'Employee',
-  //       'isActive': true,
-  //       'createdAt': FieldValue.serverTimestamp(),
-  //     });
-  //     // 2. UPDATE THE TOTAL MEMBER COUNT IN FIREBASE
-  //     // We target the specific department document using the deptCode
-  //     await FirebaseFirestore.instance
-  //         .collection('departments')
-  //         .doc(widget.deptCode) 
-  //         .update({
-  //       'totalMembers': FieldValue.increment(1), // Adds 1 to the existing value
-  //     });
-  //     return null;
-  //   } catch (e) {
-  //     return e.toString();
-  //   }
-  // }
-
   Future<void> _removeEmployee(String docId) async {
     try {
-      // 1. Show a loading spinner so the manager knows it's processing
+      // 1. Show loading spinner
       showDialog(
         context: context,
         barrierDismissible: false,
         builder: (context) => const Center(child: CircularProgressIndicator()),
       );
 
-      // 2. Perform the deletions and updates
-      // It's good practice to do these together
-      await FirebaseFirestore.instance.collection('users').doc(docId).delete();
-      await FirebaseFirestore.instance
-          .collection('departments')
-          .doc(widget.deptCode)
-          .update({
+      final DateTime now = DateTime.now();
+      // Find all shifts for this user that haven't happened yet
+      var futureShifts = await FirebaseFirestore.instance
+          .collection('shifts')
+          .where('shiftUserID', isEqualTo: docId)
+          .where('shiftStartTime', isGreaterThan: now)
+          .get();
+
+      // 2. Use a Batch to update both User and Department
+      WriteBatch batch = FirebaseFirestore.instance.batch();
+      
+      DocumentReference userRef = FirebaseFirestore.instance.collection('users').doc(docId);
+      DocumentReference deptRef = FirebaseFirestore.instance.collection('departments').doc(widget.deptCode);
+
+      batch.update(userRef, {
+        'status': 'disabled', // The key flag
+        'deptCode': null,     // Disconnect them from the department
+        'removedAt': FieldValue.serverTimestamp(),
+      });
+
+      batch.update(deptRef, {
         'totalMembers': FieldValue.increment(-1),
       });
 
-      // 3. Close the loading spinner
-      if (mounted) Navigator.pop(context);
+      for (var shift in futureShifts.docs) {
+        batch.delete(shift.reference);
+      }
 
-      // 4. Show success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Employee removed successfully"), backgroundColor: Colors.red),
-      );
+      await batch.commit();
+
+      if (mounted) Navigator.pop(context); // Close spinner
+
+      _showSnackBar("Employee deactivated. (Note: Admin must manually delete Auth account to reuse email)", Colors.orange);
     } catch (e) {
-      // Close loading spinner if error occurs
       if (mounted) Navigator.pop(context);
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error removing employee: $e")),
-      );
+      _showSnackBar("Error: $e", Colors.red);
     }
+  }
+
+  // Helper for showing messages
+  void _showSnackBar(String message, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: color),
+    );
   }
 }

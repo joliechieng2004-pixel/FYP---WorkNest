@@ -40,6 +40,8 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
   String email = "Email";
   String contact = "0XX-XXXXXXX";
 
+  bool isWaitingForVerification = false;
+
   int _expandedIndex = 0;
 
   // --- INITIALIZATION ---
@@ -152,7 +154,7 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
                         children: [
                           Row(
                             children: [
-                              Flexible( // Use Flexible instead of Expanded here
+                              Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
@@ -173,7 +175,7 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
                                 ),
                               ),
                               const SizedBox(width: 15),
-                              Flexible(
+                              Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
@@ -195,8 +197,33 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
                               ),
                             ],
                           ),
-                          const SizedBox(height: 10),
-                          const Text("Email:", style: TextStyle(fontSize: 18)),
+                          Row(
+                            children: [
+                              const SizedBox(height: 10),
+                              const Text("Email:", style: TextStyle(fontSize: 18)),
+                              const SizedBox(width: 8),
+
+                              // Dynamic Status Indicator
+                              if (isWaitingForVerification || !(FirebaseAuth.instance.currentUser?.emailVerified ?? false)) ...[
+                                const Text("(Pending Verification)", 
+                                    style: TextStyle(color: Colors.orange, fontSize: 12, fontWeight: FontWeight.w500)),
+                                const SizedBox(width: 4),
+                                GestureDetector(
+                                  onTap: _refreshVerificationStatus,
+                                  child: const Icon(Icons.refresh, color: Color.fromARGB(255, 40, 75, 158), size: 18),
+                                ),
+                              ]
+                              else ...[
+                                const Icon(Icons.verified, color: Colors.green, size: 20),
+                                const SizedBox(width: 4),
+                                // The Refresh Button
+                                GestureDetector(
+                                  onTap: _refreshVerificationStatus,
+                                  child: const Icon(Icons.refresh, color: Color.fromARGB(255, 40, 75, 158), size: 18),
+                                ),
+                              ],
+                            ],
+                          ),
                           TextFormField(
                             controller: _profileEmailController,
                             decoration: InputDecoration(
@@ -227,24 +254,29 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceAround,
                             children: [
-                              ElevatedButton(
-                                onPressed: _cancelEdit,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color.fromARGB(255, 40, 75, 158),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
-                                ),
-                                child: const Text("Cancel")),
-                              ElevatedButton(
-                                onPressed: () =>_changeProfileConfirmation(), 
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color.fromARGB(255, 40, 75, 158),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
-                                ),
-                                child: const Text("Update Profile")),
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: _cancelEdit,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color.fromARGB(255, 40, 75, 158),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
+                                  ),
+                                  child: const Text("Cancel")),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: () =>_changeProfileConfirmation(), 
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color.fromARGB(255, 40, 75, 158),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
+                                  ),
+                                  child: const Text("Update")),
+                              ),
                             ],
                           )
                         ],
@@ -292,24 +324,29 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceAround,
                             children: [
-                              ElevatedButton(
-                                onPressed: _cancelEdit,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color.fromARGB(255, 40, 75, 158),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
-                                ),
-                                child: const Text("Cancel")),
-                              ElevatedButton(
-                                onPressed: () =>_validateAndUpdatePassword(),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color.fromARGB(255, 40, 75, 158),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
-                                ),
-                                child: const Text("Update Password")),
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: _cancelEdit,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color.fromARGB(255, 40, 75, 158),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
+                                  ),
+                                  child: const Text("Cancel")),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: () =>_validateAndUpdatePassword(),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color.fromARGB(255, 40, 75, 158),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
+                                  ),
+                                  child: const Text("Update")),
+                              ),
                             ],
                           )
                         ],
@@ -352,25 +389,30 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceAround,
                             children: [
-                              ElevatedButton(
-                                onPressed: _cancelEdit,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color.fromARGB(255, 40, 75, 158),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: _cancelEdit,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color.fromARGB(255, 40, 75, 158),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
+                                  ),
+                                  child: const Text("Cancel")
                                 ),
-                                child: const Text("Cancel")
                               ),
-                              ElevatedButton(
-                                onPressed: _updateNotificationSettings, 
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color.fromARGB(255, 40, 75, 158),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: _updateNotificationSettings, 
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color.fromARGB(255, 40, 75, 158),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
+                                  ),
+                                  child: const Text("Save")
                                 ),
-                                child: const Text("Save Settings")
                               )
                             ]
                           )
@@ -471,7 +513,7 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(context); // Close dialog
-                _updateProfile();       // Run the reset logic
+                _saveProfile();       // Run the reset logic
               },
               style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black),
               child: const Text("Confirm"),
@@ -482,38 +524,117 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
     );
   }
 
-  // Function to update the profile in Firebase
-  Future<void> _updateProfile() async {
+  // Save Settings
+  Future<void> _saveProfile() async {
     try {
       User? user = FirebaseAuth.instance.currentUser;
       String newEmail = _profileEmailController.text.trim();
+      String oldEmail = user?.email ?? "";
+      bool emailChanged = (user != null && newEmail != oldEmail);
 
-      // 1. Update the actual Login Credential first
-      if (user != null && user.email != newEmail) {
-        // Modern Firebase way: Sends a verification link to the NEW email
-        // The login email ONLY changes once they click the link in their inbox
-        await user.verifyBeforeUpdateEmail(newEmail);
-      }
-
-      // 2. Update the Firestore Database (What you already have)
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(docID)
-          .update({
+      // 2. Update Firestore for other fields
+      await FirebaseFirestore.instance.collection('users').doc(docID).update({
         'userFName': _profileFNameController.text.trim(),
         'userLName': _profileLNameController.text.trim(),
-        'userEmail': newEmail,
         'userContact': _profileContactController.text.trim(),
       });
 
-      // ... rest of your success logic ...
-    } on FirebaseAuthException catch (e) {
-      // Handle the "Recent Login Required" error
-      if (e.code == 'requires-recent-login') {
-        print("Please log out and log back in to change your email for security.");
+      // 1. If email changed, handle Auth verification
+      if (emailChanged) {
+        try {
+          await user.verifyBeforeUpdateEmail(newEmail);
+          setState(() => isWaitingForVerification = true);
+          _showSnackBar("Verification email sent to $newEmail!", Colors.blue);
+        } on FirebaseAuthException catch (e) {
+          if (e.code == 'requires-recent-login') {
+            _showPasswordDialog(newEmail); // Triggers re-auth flow
+            return; 
+          } else {
+            _showSnackBar("Auth Error: ${e.message}", Colors.red);
+            return;
+          }
+        }
       }
+
+      _showSnackBar("Profile updated successfully!", Colors.green);
+      setState(() => _expandedIndex = -1); // Close card
     } catch (e) {
-      print("Error: $e");
+      _showSnackBar("Error: $e", Colors.red);
+    }
+  }
+
+  // Verify User Credential before Update New Email
+  Future<void> _showPasswordDialog(String newEmail) async {
+    final TextEditingController passwordController = TextEditingController();
+
+    return showDialog(
+      context: context,
+      barrierDismissible: false, // User must interact with the dialog
+      builder: (context) {
+        return AlertDialog(
+          title: const Text("Confirm Password"),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text("Please enter your current password to authorize the email change."),
+              const SizedBox(height: 15),
+              TextField(
+                controller: passwordController,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: "Password",
+                  border: OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                String password = passwordController.text.trim();
+                if (password.isNotEmpty) {
+                  Navigator.pop(context);
+                  _reauthenticateAndChangeEmail(password, newEmail);
+                }
+              },
+              child: const Text("Verify & Update"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+  
+  // Authenticate New Email
+  Future<void> _reauthenticateAndChangeEmail(String password, String newEmail) async {
+    try {
+      User? user = FirebaseAuth.instance.currentUser;
+      AuthCredential credential = EmailAuthProvider.credential(
+        email: user!.email!, 
+        password: password
+      );
+
+      // Re-authenticate
+      await user.reauthenticateWithCredential(credential);
+      // Trigger the Verification Email
+      await user.verifyBeforeUpdateEmail(newEmail);
+
+      setState(() {
+        isWaitingForVerification = true; // Trigger the UI change
+      });
+      
+      // Update Firestore NOW so the UI reflects the "Pending" change
+      await FirebaseFirestore.instance.collection('users').doc(docID).update({
+        'userEmail': newEmail,
+        'emailVerified': false, // Add this field to track status
+      });
+      _showSnackBar("Success! Please check $newEmail to verify your account.", Colors.blue);
+    } catch (e) {
+      _showSnackBar("Error: ${e.toString()}", Colors.red);
     }
   }
 
@@ -604,6 +725,33 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
         ],
       ),
     );
+  }
+
+  // Email Verification Status
+  Future<void> _refreshVerificationStatus() async {
+    try {
+      User? user = FirebaseAuth.instance.currentUser;
+      
+      // This is the key command—it forces a fetch from Firebase Auth
+      await user?.reload(); 
+
+      if (user?.emailVerified ?? false) {
+        setState(() {
+          isWaitingForVerification = false; // Switch back to the green icon
+        });
+
+        _showSnackBar("Email verified successfully!", Colors.green);
+        
+        // Also update Firestore to keep the 'emailVerified' flag in sync
+        await FirebaseFirestore.instance.collection('users').doc(docID).update({
+          'emailVerified': true,
+        });
+      } else {
+        _showSnackBar("Email not verified yet. Please check your inbox.", Colors.orange);
+      }
+    } catch (e) {
+      _showSnackBar("Error refreshing status: $e", Colors.red);
+    }
   }
 
   // Helper to clean up after successful update
@@ -706,7 +854,7 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
                   );
                 }
               },
-              child: const Text("Logout"),
+              child: const Text("Log Out"),
             ),
           ],
         );

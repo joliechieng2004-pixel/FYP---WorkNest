@@ -127,10 +127,10 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
                     });
                   },
                   // Custom Styling
-                  calendarStyle: const CalendarStyle(
-                    todayDecoration: BoxDecoration(color: Colors.blueAccent, shape: BoxShape.circle),
-                    selectedDecoration: BoxDecoration(color: Color(0xFF1A3E88), shape: BoxShape.circle),
-                    markerDecoration: BoxDecoration(color: Colors.red, shape: BoxShape.circle), // For shifts
+                  calendarStyle: CalendarStyle(
+                    todayDecoration: const BoxDecoration(color: Colors.blueAccent, shape: BoxShape.circle),
+                    selectedDecoration: BoxDecoration(color: primaryBlue, shape: BoxShape.circle),
+                    markerDecoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle), // For shifts
                   ),
                   headerStyle: const HeaderStyle(
                     formatButtonVisible: true,

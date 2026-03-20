@@ -19,6 +19,8 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
   String _selectedPeriod = "Weekly";
   
   Stream<QuerySnapshot>? _attendanceStream;
+
+  final Map<String, TextEditingController> _reasonControllers = {};
   
   @override
   void initState() {
@@ -29,6 +31,15 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
         .where('deptCode', isEqualTo: widget.deptCode)
         .orderBy('attendanceDate', descending: true)
         .snapshots();
+  }
+
+  @override
+  void dispose() {
+    // Clean up controllers when page closes
+    for (var controller in _reasonControllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
   }
 
   @override
@@ -147,7 +158,6 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
       child: const Row(
         children: [
           //TODO: change from ID to checkbox
-          Expanded(flex: 1, child: Center(child: Text("#", style: TextStyle(fontWeight: FontWeight.bold)))),
           Expanded(flex: 3, child: Center(child: Text("Date", style: TextStyle(fontWeight: FontWeight.bold)))),
           Expanded(flex: 3, child: Center(child: Text("Worker", style: TextStyle(fontWeight: FontWeight.bold)))),
           Expanded(flex: 2, child: Center(child: Text("Status", style: TextStyle(fontWeight: FontWeight.bold)))),
@@ -161,46 +171,30 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
   Widget _buildExpandableAttendanceRow(DocumentSnapshot doc, int index) {
     Map<String, dynamic> attendance = doc.data() as Map<String, dynamic>;
 
-    // 1. Safe extraction and conversion of Timestamps
-    // We check if the data is a Timestamp before calling .toDate()
-    DateTime? day;
-    if (attendance['attendanceDate'] is Timestamp) {
-      day = (attendance['attendanceDate'] as Timestamp).toDate();
-    }
+    // --- 1. Data Parsing ---
+    DateTime? day = attendance['attendanceDate'] is Timestamp ? (attendance['attendanceDate'] as Timestamp).toDate() : null;
+    DateTime? start = attendance['attendanceStartTime'] is Timestamp ? (attendance['attendanceStartTime'] as Timestamp).toDate() : null;
+    DateTime? end = attendance['attendanceEndTime'] is Timestamp ? (attendance['attendanceEndTime'] as Timestamp).toDate() : null;
 
-    DateTime? start;
-    if (attendance['attendanceStartTime'] is Timestamp) {
-      start = (attendance['attendanceStartTime'] as Timestamp).toDate();
-    }
-    
-    DateTime? end;
-    if (attendance['attendanceEndTime'] is Timestamp) {
-      end = (attendance['attendanceEndTime'] as Timestamp).toDate();
-    }
-
-    // 2. Format the times for display
     String formattedStartTime = start != null ? DateFormat.jm().format(start) : "--:--";
     String formattedEndTime = end != null ? DateFormat.jm().format(end) : "--:--";
-    String formattedDate = day != null ? DateFormat('dd MMM yyyy').format(day) : "No Date Recorded";
+    String formattedDate = day != null ? DateFormat('dd MMM yyyy').format(day) : "No Date";
 
-    // 1.5 Calculate Duration
     String formattedDuration = "--";
-
     if (start != null && end != null) {
       Duration diff = end.difference(start);
-      
-      int hours = diff.inHours;
-      int minutes = diff.inMinutes.remainder(60);
-      
-      formattedDuration = "${hours}h ${minutes}m";
-    } else if (start != null && end == null) {
+      formattedDuration = "${diff.inHours}h ${diff.inMinutes.remainder(60)}m";
+    } else if (start != null) {
       formattedDuration = "In Progress";
     }
 
+    // --- 2. State Logic Variables ---
     String status = attendance['attendanceApproval']?.toString() ?? 'Pending';
-    String workerName = attendance['attendanceUserName']?.toString() ?? 'Unknown User';
-
+    String workerName = attendance['attendanceUserName']?.toString() ?? 'Unknown';
+    String? approvalReason = attendance.containsKey('approvalReason') ? attendance['approvalReason'] : null;
     bool isExpanded = _expandedIndex == index;
+
+    _reasonControllers.putIfAbsent(doc.id, () => TextEditingController());
 
     return GestureDetector(
       onTap: () {
@@ -223,22 +217,10 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
             // Basic Info Row
             Row(
               children: [
-                // Fixed: Checkbox requires a local state variable to work properly
-                Expanded(
-                  flex: 1, 
-                  child: Center(
-                    child: Checkbox(
-                      value: false, // You'll need a list of bools to manage this state properly
-                      onChanged: (bool? val) {
-                        // Handle checkbox selection logic here
-                      }
-                    )
-                  )
-                ),
                 Expanded(flex: 3, child: Center(child: Text(formattedDate))),
                 Expanded(flex: 3, child: Center(child: Text(workerName))),
                 Expanded(
-                  flex: 2, 
+                  flex: 3, 
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -265,11 +247,11 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
                 Expanded(flex: 1, child: Icon(isExpanded ? Icons.expand_less : Icons.expand_more, size: 18)),
               ],
             ),
-            
-            // Expandable Action Buttons
+
             if (isExpanded) ...[
               const Divider(height: 20),
-              Column( // Changed to Column for better layout when expanded
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch, // Stretch items to fill width
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -280,14 +262,74 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _actionButton("Reject", Colors.red, () => _updateAttendanceStatus(doc.id, "Rejected")),
-                      const SizedBox(width: 20),
-                      _actionButton("Approve", Colors.green, () => _updateAttendanceStatus(doc.id, "Approved")),
-                    ],
-                  ),
+
+                  // --- STATE 1: PENDING ---
+                  if (status == 'Pending') ...[
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _actionButton("Reject", Colors.red, () => _updateAttendanceStatus(doc.id, "Rejected", null)),
+                        const SizedBox(width: 20),
+                        _actionButton("Approve", Colors.green, () => _updateAttendanceStatus(doc.id, "Approved", null)),
+                      ],
+                    ),
+                  ]
+
+                  // --- STATE 2: EDITING (Status defined, but no reason given yet) ---
+                  else if (status != 'Pending' && approvalReason == null) ...[
+                    TextField(
+                      controller: _reasonControllers[doc.id],
+                      decoration: const InputDecoration(
+                        hintText: 'Reason for changing the approval status',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _actionButton("Reject", Colors.red, () {
+                          String reason = _reasonControllers[doc.id]!.text.trim();
+                          if (reason.isNotEmpty) {
+                            _updateAttendanceStatus(doc.id, "Rejected", reason);
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please enter a reason")));
+                          }
+                        }),
+                        const SizedBox(width: 20),
+                        _actionButton("Approve", Colors.green, () {
+                          String reason = _reasonControllers[doc.id]!.text.trim();
+                          if (reason.isNotEmpty) {
+                            _updateAttendanceStatus(doc.id, "Approved", reason);
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please enter a reason")));
+                          }
+                        }),
+                      ],
+                    ),
+                  ]
+
+                  // --- STATE 3: LOCKED (Status defined AND reason exists) ---
+                  else if (status != 'Pending' && approvalReason != null) ...[
+                    TextField(
+                      controller: TextEditingController(text: approvalReason), // Show the saved reason
+                      enabled: false, // Locks the text field
+                      decoration: InputDecoration(
+                        labelText: 'Reason for change to $status (Locked)',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      style: const TextStyle(color: Colors.black87), // Ensures text is readable when disabled
+                    ),
+                    const SizedBox(height: 8),
+                    const Center(
+                      child: Text(
+                        "Status can no longer be changed.",
+                        style: TextStyle(color: Colors.grey, fontSize: 12, fontStyle: FontStyle.italic),
+                      ),
+                    ),
+                  ]
                 ],
               ),
             ]
@@ -407,20 +449,37 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
 
   void onChanged(bool? value) {}
   
-  Future<void> _updateAttendanceStatus(String docId, String newStatus) async {
+  // Added 'String? reason' parameter
+  Future<void> _updateAttendanceStatus(String docId, String newStatus, String? reason) async {
     try {
+      // Build the data to update dynamically
+      Map<String, dynamic> updateData = {
+        'attendanceApproval': newStatus,
+      };
+
+      // If a reason is provided (State 2), add it to the database
+      if (reason != null) {
+        updateData['approvalReason'] = reason;
+      }
+
       await FirebaseFirestore.instance
           .collection('attendances')
           .doc(docId)
-          .update({
-        'attendanceApproval': newStatus,
-      });
+          .update(updateData);
+
+      // If we just saved a reason, clear the text field controller
+      if (reason != null && _reasonControllers.containsKey(docId)) {
+        _reasonControllers[docId]!.clear();
+      }
 
       // Show a small confirmation to the manager
       if (mounted) {
+        setState(() {
+          _expandedIndex = null; // Step 2: Auto-collapse after action
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Attendance $newStatus"),
+            content: Text(reason == null ? "Attendance $newStatus" : "Status changed and locked!"),
             backgroundColor: newStatus == "Approved" ? Colors.green : Colors.red,
             duration: const Duration(seconds: 1),
           ),
@@ -430,7 +489,7 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
       debugPrint("Error updating status: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Failed to update status")),
+          const SnackBar(content: Text("Failed to update status"), backgroundColor: Colors.red),
         );
       }
     }
@@ -546,27 +605,40 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
 
   Widget _buildPeriodToggle() {
     return Padding(
-      padding: const EdgeInsets.all(20.0),
-      child: SegmentedButton<String>(
-        // Define the choices
-        segments: const [
-          ButtonSegment(value: "Weekly", label: Text("Week")),
-          ButtonSegment(value: "Monthly", label: Text("Month")),
-          ButtonSegment(value: "Yearly", label: Text("Year")),
-        ],
-        // Tell it which one is currently highlighted
-        selected: {_selectedPeriod},
-        // What happens when a user clicks a new one
-        onSelectionChanged: (Set<String> newSelection) {
-          setState(() {
-            _selectedPeriod = newSelection.first;
-            // This triggers the StreamBuilder to restart with new dates!
-          });
-        },
-        style: SegmentedButton.styleFrom(
-          selectedBackgroundColor: primaryBlue,
-          selectedForegroundColor: bgLightBlue,
-          side: const BorderSide(width: 1),
+      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
+      child: SizedBox(
+        width: double.infinity, // 1. Force the container to full width
+        child: SegmentedButton<String>(
+          // 2. Hide the check icon to keep label centering consistent
+          showSelectedIcon: false, 
+          segments: const [
+            ButtonSegment(
+              value: "Weekly", 
+              label: Center(child: Text("Week")), // 3. Wrap label in Center
+            ),
+            ButtonSegment(
+              value: "Monthly", 
+              label: Center(child: Text("Month")),
+            ),
+            ButtonSegment(
+              value: "Yearly", 
+              label: Center(child: Text("Year")),
+            ),
+          ],
+          selected: {_selectedPeriod},
+          onSelectionChanged: (Set<String> newSelection) {
+            setState(() {
+              _selectedPeriod = newSelection.first;
+            });
+          },
+          style: SegmentedButton.styleFrom(
+            selectedBackgroundColor: primaryBlue,
+            selectedForegroundColor: bgLightBlue,
+            // 4. Ensure visual density is tight
+            visualDensity: VisualDensity.comfortable,
+            side: const BorderSide(width: 1, color: Colors.grey),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
         ),
       ),
     );

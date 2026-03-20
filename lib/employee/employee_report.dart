@@ -285,27 +285,40 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
 
   Widget _buildPeriodToggle() {
     return Padding(
-      padding: const EdgeInsets.all(20.0),
-      child: SegmentedButton<String>(
-        // Define the choices
-        segments: const [
-          ButtonSegment(value: "Weekly", label: Text("Week")),
-          ButtonSegment(value: "Monthly", label: Text("Month")),
-          ButtonSegment(value: "Yearly", label: Text("Year")),
-        ],
-        // Tell it which one is currently highlighted
-        selected: {_selectedPeriod},
-        // What happens when a user clicks a new one
-        onSelectionChanged: (Set<String> newSelection) {
-          setState(() {
-            _selectedPeriod = newSelection.first;
-            // This triggers the StreamBuilder to restart with new dates!
-          });
-        },
-        style: SegmentedButton.styleFrom(
-          selectedBackgroundColor: primaryBlue,
-          selectedForegroundColor: bgLightBlue,
-          side: const BorderSide(width: 1),
+      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
+      child: SizedBox(
+        width: double.infinity, // 1. Force the container to full width
+        child: SegmentedButton<String>(
+          // 2. Hide the check icon to keep label centering consistent
+          showSelectedIcon: false, 
+          segments: const [
+            ButtonSegment(
+              value: "Weekly", 
+              label: Center(child: Text("Week")), // 3. Wrap label in Center
+            ),
+            ButtonSegment(
+              value: "Monthly", 
+              label: Center(child: Text("Month")),
+            ),
+            ButtonSegment(
+              value: "Yearly", 
+              label: Center(child: Text("Year")),
+            ),
+          ],
+          selected: {_selectedPeriod},
+          onSelectionChanged: (Set<String> newSelection) {
+            setState(() {
+              _selectedPeriod = newSelection.first;
+            });
+          },
+          style: SegmentedButton.styleFrom(
+            selectedBackgroundColor: primaryBlue,
+            selectedForegroundColor: bgLightBlue,
+            // 4. Ensure visual density is tight
+            visualDensity: VisualDensity.comfortable,
+            side: const BorderSide(width: 1, color: Colors.grey),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
         ),
       ),
     );

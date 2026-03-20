@@ -180,17 +180,6 @@ class _ManagerHomePageState extends State<ManagerHome> {
               ),
             ),
 
-            // 3. Summary Card
-            _buildCard(
-              child: Column(
-                children: [
-                  _buildStatRow("Today's Employee", "20"),
-                  _buildStatRow("Attendance Rate", "90%"),
-                  _buildStatRow("Pending Approval", "10"),
-                ],
-              ),
-            ),
-
             // 4. Activities Card (Scrollable Version)
             // TODO: link employee's activity within the activity card
             _buildCard(
@@ -250,28 +239,6 @@ class _ManagerHomePageState extends State<ManagerHome> {
         ],
       ),
       child: child,
-    );
-  }
-
-  // Helper for Summary Rows
-  Widget _buildStatRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 5),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          Container(
-            width: 60,
-            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 5),
-            decoration: BoxDecoration(
-              border: Border.all(color: primaryBlue),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Text(value, textAlign: TextAlign.center, style: const TextStyle(color: Colors.blueGrey, fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
     );
   }
 
@@ -343,7 +310,7 @@ class _ManagerHomePageState extends State<ManagerHome> {
         int onTimeCount = snapshot.data!.docs.where((d) => d['attendanceStatus'] == "On-Time").length;
 
         return SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(7),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

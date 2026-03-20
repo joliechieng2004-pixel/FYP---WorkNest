@@ -250,7 +250,7 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                         children: [
                           Row(
                             children: [
-                              FittedBox( // Use Flexible instead of Expanded here
+                              Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
@@ -271,7 +271,7 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                                 ),
                               ),
                               const SizedBox(width: 15),
-                              Flexible(
+                              Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
@@ -350,24 +350,29 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceAround,
                             children: [
-                              ElevatedButton(
-                                onPressed: _cancelEdit,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color.fromARGB(255, 40, 75, 158),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
-                                ),
-                                child: const Text("Cancel")),
-                              ElevatedButton(
-                                onPressed: () =>_changeProfileConfirmation(), 
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color.fromARGB(255, 40, 75, 158),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
-                                ),
-                                child: const Text("Update Profile")),
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: _cancelEdit,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color.fromARGB(255, 40, 75, 158),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
+                                  ),
+                                  child: const Text("Cancel")),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: () =>_changeProfileConfirmation(), 
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color.fromARGB(255, 40, 75, 158),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
+                                  ),
+                                  child: const Text("Update")),
+                              ),
                             ],
                           )
                         ],
@@ -415,24 +420,29 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceAround,
                             children: [
-                              ElevatedButton(
-                                onPressed: _cancelEdit,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color.fromARGB(255, 40, 75, 158),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
-                                ),
-                                child: const Text("Cancel")),
-                              ElevatedButton(
-                                onPressed: () =>_validateAndUpdatePassword(),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color.fromARGB(255, 40, 75, 158),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
-                                ),
-                                child: const Text("Update Password")),
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: _cancelEdit,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color.fromARGB(255, 40, 75, 158),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
+                                  ),
+                                  child: const Text("Cancel")),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: () =>_validateAndUpdatePassword(),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color.fromARGB(255, 40, 75, 158),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
+                                  ),
+                                  child: const Text("Update")),
+                              ),
                             ],
                           )
                         ],
@@ -475,25 +485,30 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceAround,
                             children: [
-                              ElevatedButton(
-                                onPressed: _cancelEdit,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color.fromARGB(255, 40, 75, 158),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: _cancelEdit,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color.fromARGB(255, 40, 75, 158),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
+                                  ),
+                                  child: const Text("Cancel")
                                 ),
-                                child: const Text("Cancel")
                               ),
-                              ElevatedButton(
-                                onPressed: _saveNotification, 
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color.fromARGB(255, 40, 75, 158),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: _saveNotification, 
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color.fromARGB(255, 40, 75, 158),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
+                                  ),
+                                  child: const Text("Save")
                                 ),
-                                child: const Text("Save Settings")
                               )
                             ]
                           )
@@ -563,31 +578,37 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceAround,
                             children: [
-                              ElevatedButton(
-                                onPressed: _cancelEdit,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color.fromARGB(255, 40, 75, 158),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: _cancelEdit,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color.fromARGB(255, 40, 75, 158),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
+                                  ),
+                                  child: const Text("Cancel")
                                 ),
-                                child: const Text("Cancel")
                               ),
-                              ElevatedButton(
-                                onPressed: _saveLocation, 
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color.fromARGB(255, 40, 75, 158),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: _saveLocation, 
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color.fromARGB(255, 40, 75, 158),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
+                                  ),
+                                  child: const Text("Save")
                                 ),
-                                child: const Text("Save Settings")
                               )
                             ]
                           )
                         ],
                       ),
                     ),
+
                     _buildExpandableSetting(
                       index: 5,
                       title: "Attendance Settings",
@@ -660,25 +681,30 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceAround,
                             children: [
-                              ElevatedButton(
-                                onPressed: _cancelEdit,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color.fromARGB(255, 40, 75, 158),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: _cancelEdit,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color.fromARGB(255, 40, 75, 158),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
+                                  ),
+                                  child: const Text("Cancel")
                                 ),
-                                child: const Text("Cancel")
                               ),
-                              ElevatedButton(
-                                onPressed: _saveAttendanceSettings, 
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color.fromARGB(255, 40, 75, 158),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: _saveAttendanceSettings, 
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color.fromARGB(255, 40, 75, 158),
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
+                                  ),
+                                  child: const Text("Save")
                                 ),
-                                child: const Text("Save Settings")
                               )
                             ]
                           )
@@ -815,6 +841,14 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
       String oldEmail = user?.email ?? "";
       bool emailChanged = (user != null && newEmail != oldEmail);
 
+      // 2. Update Firestore for other fields
+      await FirebaseFirestore.instance.collection('users').doc(docID).update({
+        'userFName': _profileFNameController.text.trim(),
+        'userLName': _profileLNameController.text.trim(),
+        'userContact': _profileContactController.text.trim(),
+      });
+
+      
       // 1. If email changed, handle Auth verification
       if (emailChanged) {
         try {
@@ -831,13 +865,6 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
           }
         }
       }
-
-      // 2. Update Firestore for other fields
-      await FirebaseFirestore.instance.collection('users').doc(docID).update({
-        'userFName': _profileFNameController.text.trim(),
-        'userLName': _profileLNameController.text.trim(),
-        'userContact': _profileContactController.text.trim(),
-      });
 
       _showSnackBar("Profile updated successfully!", Colors.green);
       setState(() => _expandedIndex = -1); // Close card
