@@ -167,6 +167,32 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
     }
   }
 
+  // --- HELPER TO FETCH SETTINGS ---
+  // Assuming 'deptCode' is available in your State class.
+  Future<Map<String, bool>> _getDepartmentSettings() async {
+    try {
+      QuerySnapshot deptSnapshot = await FirebaseFirestore.instance
+          .collection('departments')
+          .where('deptCode', isEqualTo: deptCode) 
+          .limit(1)
+          .get();
+
+      if (deptSnapshot.docs.isNotEmpty) {
+        var data = deptSnapshot.docs.first.data() as Map<String, dynamic>;
+        if (data.containsKey('attendanceSettings')) {
+          var settings = data['attendanceSettings'] as Map<String, dynamic>;
+          return {
+            'requireGPS': settings['requireGPS'] ?? true, // Default to true for security
+            'requireFace': settings['requireFace'] ?? true,
+          };
+        }
+      }
+    } catch (e) {
+      debugPrint("Error fetching dept settings: $e");
+    }
+    return {'requireGPS': true, 'requireFace': true}; // Fallback to strict mode if error
+  }
+
   DateTime? safeConvertToDateTime(dynamic value) {
     if (value == null) return null;
     if (value is Timestamp) return value.toDate();
@@ -451,32 +477,47 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
           barrierDismissible:false,
           builder: (context) => const Center(child: CircularProgressIndicator()));
 
-        // --- CHECK LOCATION ---
-        // Handle permissions and get position
-        bool hasPermission = await LocationService.handleLocationPermission();
+        // --- FETCH DYNAMIC SETTINGS ---
+        Map<String, bool> settings = await _getDepartmentSettings();
+        bool requireGPS = settings['requireGPS']!;
+        bool requireFace = settings['requireFace']!;
 
-        if (!hasPermission) {
-          Navigator.pop(context);
-          _showSnackBar("Location permissions denied.", Colors.red);
-          return;
-        }
+        GeoPoint currentGeoPoint;
+        
+        // --- CHECK LOCATION (CONDITIONAL) ---
+        if (requireGPS) {
+          // Handle permissions and get position
+          bool hasPermission = await LocationService.handleLocationPermission();
 
-         //1. Get User's Current GPS Position
-        Position position = await _getCurrentLocation() ?? await Geolocator.getCurrentPosition();
-        //2. Calculate Distance from Office
-        double distanceInMeters = LocationService.getDistance(
-          position.latitude,
-          position.longitude,
-          officeLat,
-          officeLng
-        );
+          if (!hasPermission) {
+            Navigator.pop(context);
+            _showSnackBar("Location permissions denied.", Colors.red);
+            return;
+          }
 
-        // Outside of office radius
-        // If not activated, the location is verified successfully
-        if (distanceInMeters > officeRadius){
-          Navigator.pop(context);
-          _showSnackBar("Too far: ${distanceInMeters.toInt()}m away.", Colors.red);
-          return;
+          //1. Get User's Current GPS Position
+          Position position = await _getCurrentLocation() ?? await Geolocator.getCurrentPosition();
+          //2. Calculate Distance from Office
+          double distanceInMeters = LocationService.getDistance(
+            position.latitude,
+            position.longitude,
+            officeLat,
+            officeLng
+          );
+
+          // Outside of office radius
+          // If not activated, the location is verified successfully
+          if (distanceInMeters > officeRadius){
+            Navigator.pop(context);
+            _showSnackBar("Too far: ${distanceInMeters.toInt()}m away.", Colors.red);
+            return;
+          }
+
+          // ready to send location to the attendance log
+          currentGeoPoint = GeoPoint(position.latitude, position.longitude);
+        } else {
+          // If GPS is skipped, provide a fallback location so your backend doesn't crash
+          currentGeoPoint = GeoPoint(officeLat, officeLng);
         }
         
         // --- CHECK SHIFT ---
@@ -504,16 +545,19 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
           if (!insist) return; // Exit if they click "Cancel"
         }
 
-        // --- FACE (OPTIONAL) ---
+        // --- FACE VERIFICATION (OPTIONAL) ---
         bool faceVerified = true;
-        // Face verification screen placeholder
-        if (AppConfig.useFaceVerificationStub) {
-          // Wait for the stub screen to return 'true'
-          faceVerified = await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const FaceVerification()),
-          ) ?? false;
-
+        
+        if (requireFace) {
+          // Face verification screen placeholder
+          if (AppConfig.useFaceVerificationStub) {
+            // Wait for the stub screen to return 'true'
+            faceVerified = await Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const FaceVerification()),
+            ) ?? false;
+            // Real Face Verification Login
+          }
         }
 
         if (faceVerified) { // Face success (fake)
@@ -523,9 +567,6 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
             barrierDismissible: false,
             builder: (context) => const Center(child: CircularProgressIndicator()),
           );
-
-          // ready to send location to the attendance log
-          GeoPoint currentGeoPoint = GeoPoint(position.latitude, position.longitude);
 
           String? error = await _authService.clockInUser(
             uid: user.uid,
@@ -567,50 +608,91 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
         builder: (context) => const Center(child: CircularProgressIndicator())
       );
 
-      // Rule 3: Verify Location Again
-      bool hasPermission = await LocationService.handleLocationPermission();
-      if (!hasPermission) {
-        if (mounted) Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Location permissions denied."), backgroundColor: Colors.red));
-        return;
-      }
+      // --- FETCH DYNAMIC SETTINGS ---
+      Map<String, bool> settings = await _getDepartmentSettings();
+      bool requireGPS = settings['requireGPS']!;
+      bool requireFace = settings['requireFace']!;
 
-      Position position = await _getCurrentLocation() ?? await Geolocator.getCurrentPosition();
-      double distanceInMeters = LocationService.getDistance(
-        position.latitude,
-        position.longitude,
-        officeLat,
-        officeLng
-      );
+      GeoPoint currentGeoPoint;
 
-      if (distanceInMeters > officeRadius) {
-        if (mounted) Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Too far to clock out: ${distanceInMeters.toInt()}m away."), backgroundColor: Colors.red)
+      // Rule 3: Verify Location Again (IF NEEDED)
+      if (requireGPS) {
+        bool hasPermission = await LocationService.handleLocationPermission();
+
+        if (!hasPermission) {
+          if (mounted) Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Location permissions denied."), backgroundColor: Colors.red));
+          return;
+        }
+
+        Position position = await _getCurrentLocation() ?? await Geolocator.getCurrentPosition();
+        double distanceInMeters = LocationService.getDistance(
+          position.latitude,
+          position.longitude,
+          officeLat,
+          officeLng
         );
-        return;
-      }
 
-      // Call the backend service function
-      String? error = await _authService.clockOutUser(uid: user.uid);
+        if (distanceInMeters > officeRadius) {
+          if (mounted) Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Too far to clock out: ${distanceInMeters.toInt()}m away."), backgroundColor: Colors.red)
+          );
+          return;
+        }
 
-      if (mounted) Navigator.pop(context); // Close loading
-
-      if (error == null) {
-        _timer?.cancel();
-        _timer = null;
-
-        setState(() {
-          _isClockedIn = false;
-          _workingHours = "00:00:00";
-          _startTime = null;
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Clock-out recorded successfully!"), backgroundColor: Colors.green),
-        );
+        currentGeoPoint = GeoPoint(position.latitude, position.longitude);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+        // If GPS is skipped, provide a fallback location so your backend doesn't crash
+        currentGeoPoint = GeoPoint(officeLat, officeLng);
+      }
+
+      // --- FACE VERIFICATION (OPTIONAL) ---
+      bool faceVerified = true;
+      
+      if (requireFace) {
+        if (mounted && Navigator.canPop(context)) Navigator.pop(context);
+        
+        // Face verification screen placeholder
+        if (AppConfig.useFaceVerificationStub) {
+          // Wait for the stub screen to return 'true'
+          faceVerified = await Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => const FaceVerification()),
+          ) ?? false;
+          // Real Face Verification Login
+        }
+      }
+
+      if (faceVerified){
+        // Re-open Loading Spinner for the database write
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(child: CircularProgressIndicator()),
+        );
+
+        // Call the backend service function
+        String? error = await _authService.clockOutUser(uid: user.uid);
+
+        if (mounted) Navigator.pop(context); // Close loading
+
+        if (error == null) {
+          _timer?.cancel();
+          _timer = null;
+
+          setState(() {
+            _isClockedIn = false;
+            _workingHours = "00:00:00";
+            _startTime = null;
+          });
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Clock-out recorded successfully!"), backgroundColor: Colors.green),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+        }
       }
     } catch (e) {
       if (mounted && Navigator.canPop(context)) Navigator.pop(context);

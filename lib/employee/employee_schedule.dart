@@ -240,6 +240,7 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
                                 var data = doc.data() as Map<String, dynamic>;
                                 
                                 // Extract and format data
+                                String employeeName = data['leaveUserName'] ?? "pending";
                                 String status = data['leaveStatus'] ?? "pending";
                                 String reason = data['leaveReason'] ?? "No reason provided";
                                 DateTime date = (data['leaveDate'] as Timestamp).toDate();
@@ -248,6 +249,7 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
                                 return ExpandableLeaveItem(
                                   docId: doc.id,
                                   title: formattedDate,
+                                  name: employeeName,
                                   reason: reason,
                                   status: status,
                                   isManager: false,

@@ -274,7 +274,7 @@ class _ManagerHomePageState extends State<ManagerHome> {
   Widget _buildStatChip(String label, String value, Color color) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.all(15),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 15),
         decoration: BoxDecoration(
           color: bgLightBlue,
           borderRadius: BorderRadius.circular(20),
@@ -322,9 +322,9 @@ class _ManagerHomePageState extends State<ManagerHome> {
               Row(
                 children: [
                   _buildStatChip("Present", totalPresent.toString(), Colors.blue),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 7),
                   _buildStatChip("On-Time", onTimeCount.toString(), Colors.green),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 7),
                   _buildStatChip("Late", lateCount.toString(), Colors.orange),
                 ],
               ),

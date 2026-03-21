@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 class ExpandableLeaveItem extends StatefulWidget {
   final String docId;
   final String title;
+  final String name;
   final String reason;
   final String status;
   final bool isManager;
@@ -13,6 +14,7 @@ class ExpandableLeaveItem extends StatefulWidget {
     super.key, 
     required this.docId,
     required this.title, 
+    required this.name,
     required this.reason, 
     required this.status,
     required this.isManager,
@@ -76,6 +78,9 @@ class _ExpandableLeaveItemState extends State<ExpandableLeaveItem> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  const Text("Employee Name:", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  Text(widget.name, style: const TextStyle(color: Colors.black87)),
+                  const Divider(),
                   const Text("Reason for Leave:", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                   Text(widget.reason, style: const TextStyle(color: Colors.black87)),
                   

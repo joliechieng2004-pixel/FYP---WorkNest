@@ -20,6 +20,7 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
   
   late Stream<QuerySnapshot> _shiftStream;
   late Stream<QuerySnapshot> _userStream;
+  late Stream<QuerySnapshot> _leaveStream;
 
   // Calendar
   CalendarFormat _calendarFormat = CalendarFormat.month;
@@ -45,19 +46,63 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
     super.initState();
     _selectedDay = DateTime.now(); // Default selection to today
     initStreams();
+    // Debug Check
+    // _debugCheckDatabase();
   }
 
   void initStreams(){
+    if (_selectedDay == null) return;
+
+    // 1. Force the date to the very beginning of the LOCAL day
+    DateTime localStart = DateTime(_selectedDay!.year, _selectedDay!.month, _selectedDay!.day, 0, 0, 0);
+    
+    // 2. Force the date to the very end of the LOCAL day
+    DateTime localEnd = DateTime(_selectedDay!.year, _selectedDay!.month, _selectedDay!.day, 23, 59, 59, 999);
+
+    print("Querying from: ${localStart.toIso8601String()}");
+    print("Querying to: ${localEnd.toIso8601String()}");
+
     _shiftStream = FirebaseFirestore.instance
             .collection('shifts')
             .where('deptCode', isEqualTo: widget.deptCode)
-            .where('shiftDate', isEqualTo: Timestamp.fromDate(_selectedDay!))
+            .where('shiftDate', isGreaterThanOrEqualTo: Timestamp.fromDate(localStart))
+            .where('shiftDate', isLessThanOrEqualTo: Timestamp.fromDate(localEnd))
+            .snapshots();
+    _leaveStream = FirebaseFirestore.instance
+            .collection('leaves')
+            .where('leaveStatus', isEqualTo: 'approved')
+            .where('leaveDate', isGreaterThanOrEqualTo: Timestamp.fromDate(localStart))
+            .where('leaveDate', isLessThanOrEqualTo: Timestamp.fromDate(localEnd))
             .snapshots();
     _userStream = FirebaseFirestore.instance
             .collection('users')
             .where('deptCode', isEqualTo: widget.deptCode)
             .where('userRole', isEqualTo: 'employee')
             .snapshots();
+  }
+
+  void _debugCheckDatabase() async {
+    print("--- DATABASE INSPECTION START ---");
+    var snapshot = await FirebaseFirestore.instance
+        .collection('shifts')
+        .where('deptCode', isEqualTo: widget.deptCode)
+        .get();
+
+    if (snapshot.docs.isEmpty) {
+      print("Zero shifts found even WITHOUT date filtering. Check your deptCode!");
+    }
+
+    for (var doc in snapshot.docs) {
+      var data = doc.data();
+      var dateField = data['shiftDate'];
+      
+      if (dateField is Timestamp) {
+        print("Doc ID: ${doc.id} | Date: ${dateField.toDate()} | Type: Timestamp");
+      } else {
+        print("Doc ID: ${doc.id} | Date: $dateField | Type: ${dateField.runtimeType} (ERROR: Should be Timestamp)");
+      }
+    }
+    print("--- DATABASE INSPECTION END ---");
   }
 
   @override
@@ -113,10 +158,17 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
 
                       // RE-INITIALIZE the shift stream for the new date!
                       _shiftStream = FirebaseFirestore.instance
-                          .collection('shifts')
-                          .where('deptCode', isEqualTo: widget.deptCode)
-                          .where('shiftDate', isEqualTo: Timestamp.fromDate(_selectedDay!))
-                          .snapshots();
+                              .collection('shifts')
+                              .where('deptCode', isEqualTo: widget.deptCode)
+                              .where('shiftDate', isGreaterThanOrEqualTo: Timestamp.fromDate(_selectedDay!))
+                              .where('shiftDate', isLessThanOrEqualTo: Timestamp.fromDate(_selectedDay!))
+                              .snapshots();
+                      _leaveStream = FirebaseFirestore.instance
+                              .collection('leaves')
+                              .where('leaveStatus', isEqualTo: 'approved')
+                              .where('leaveDate', isGreaterThanOrEqualTo: Timestamp.fromDate(_selectedDay!))
+                              .where('leaveDate', isLessThanOrEqualTo: Timestamp.fromDate(_selectedDay!))
+                              .snapshots();
                     });
                     // TODO: Fetch shifts from Firestore for this specific date!
                     print("Selected Date: $_selectedDay");
@@ -152,47 +204,101 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
                           StreamBuilder<QuerySnapshot>(
                             stream: _shiftStream,
                             builder: (context, shiftSnapshot) {
+                              if (shiftSnapshot.hasError) {
+                                print("Firestore Error: ${shiftSnapshot.error}");
+                                return Center(child: Text("Error loading shifts. Check console for index link."));
+                              }
+
                               return StreamBuilder<QuerySnapshot>(
-                                stream: _userStream,
-                                builder: (context, userSnapshot) {
-                                  // This loading indicator is now inside the card!
-                                  if (userSnapshot.connectionState == ConnectionState.waiting) {
-                                    return const Padding(
-                                      padding: EdgeInsets.all(20.0),
-                                      child: Center(child: CircularProgressIndicator()),
-                                    );
+                                stream: _leaveStream,
+                                builder: (context, leaveSnapshot) {
+                                  if (leaveSnapshot.hasError) {
+                                    print("Firestore Error: ${leaveSnapshot.error}");
+                                    return Center(child: Text("Error loading leaves. Check console for index link."));
                                   }
 
-                                  if (!userSnapshot.hasData || userSnapshot.data!.docs.isEmpty) {
-                                    return const Padding(
-                                      padding: EdgeInsets.all(20.0),
-                                      child: Text("No workers found in this department."),
-                                    );
-                                  }
+                                  return StreamBuilder<QuerySnapshot>(
+                                    stream: _userStream,
+                                    builder: (context, userSnapshot) {
+                                      if (userSnapshot.hasError) {
+                                        print("Firestore Error: ${userSnapshot.error}");
+                                        return Center(child: Text("Error loading users. Check console for index link."));
+                                      }
+                                      
+                                      // This loading indicator is now inside the card!
+                                      if (userSnapshot.connectionState == ConnectionState.waiting) {
+                                        return const Padding(
+                                          padding: EdgeInsets.all(20.0),
+                                          child: Center(child: CircularProgressIndicator()),
+                                        );
+                                      }
+                                  
+                                      if (!userSnapshot.hasData || userSnapshot.data!.docs.isEmpty) {
+                                        return const Padding(
+                                          padding: EdgeInsets.all(20.0),
+                                          child: Text("No workers found in this department."),
+                                        );
+                                      }
+                                  
+                                      var workers = userSnapshot.data!.docs;
+                                      var activeShifts = shiftSnapshot.data?.docs ?? [];
+                                      var activeLeaves = leaveSnapshot.data?.docs ?? [];
 
-                                  var workers = userSnapshot.data!.docs;
-                                  var activeShifts = shiftSnapshot.data?.docs ?? [];
+                                      // --- DEBUGGING PRINTS ---
+                                      print("--- DEBUG START ---");
+                                      print("Active Shifts Found: ${activeShifts.length}");
+                                      print("Active Leaves Found: ${activeLeaves.length}");
+                                  
+                                      Map<String, String> workerStatusMap = {};
 
-                                  Map<String, String> workerStatusMap = {};
-                                  for (var doc in activeShifts) {
-                                    var data = doc.data() as Map<String, dynamic>;
-                                    workerStatusMap[data['shiftUserID']] = data['shiftStatus'] ?? 'pending';
-                                  }
+                                      // 3. Process Leaves FIRST. 
+                                      // If they are on leave, mark them as 'on-leave'.
+                                      // for (var doc in activeLeaves) {
+                                      //   var data = doc.data() as Map<String, dynamic>;
+                                      //   workerStatusMap[data['leaveUserID']] = 'on-leave'; 
+                                      // }
+                                      for (var doc in activeLeaves) {
+                                        var data = doc.data() as Map<String, dynamic>;
+                                        print("Leave Document Data: $data"); // Check what fields actually exist!
+                                        
+                                        // REPLACE 'leaveUserID' with your actual field name if it's different
+                                        String? leaveUser = data['leaveUserID']; 
+                                        if (leaveUser != null) {
+                                          workerStatusMap[leaveUser] = 'on-leave'; 
+                                          print("Marked $leaveUser as on-leave");
+                                        } else {
+                                          print("WARNING: 'leaveUserID' is null for document ${doc.id}");
+                                        }
+                                      }
+                                      print("--- DEBUG END ---");
 
-                                  return ListView.builder(
-                                    shrinkWrap: true,
-                                    physics: const NeverScrollableScrollPhysics(),
-                                    itemCount: workers.length,
-                                    itemBuilder: (context, index) {
-                                      var workerData = workers[index].data() as Map<String, dynamic>;
-                                      String name = "${workerData['userFName']} ${workerData['userLName']}";
-                                      String workerID = workers[index].id;
-                                      String status = workerStatusMap[workerID] ?? "none";
-
-                                      return _buildWorkerRow(name, status, workerID);
+                                      // 4. Process Shifts SECOND.
+                                      // Only add the shift status if they are NOT on leave.
+                                      for (var doc in activeShifts) {
+                                        var data = doc.data() as Map<String, dynamic>;
+                                        String uid = data['shiftUserID'];
+                                        
+                                        if (workerStatusMap[uid] != 'on-leave') {
+                                          workerStatusMap[uid] = data['shiftStatus'] ?? 'pending';
+                                        }
+                                      }
+                                  
+                                      return ListView.builder(
+                                        shrinkWrap: true,
+                                        physics: const NeverScrollableScrollPhysics(),
+                                        itemCount: workers.length,
+                                        itemBuilder: (context, index) {
+                                          var workerData = workers[index].data() as Map<String, dynamic>;
+                                          String name = "${workerData['userFName']} ${workerData['userLName']}";
+                                          String workerID = workers[index].id;
+                                          String status = workerStatusMap[workerID] ?? "none";
+                                  
+                                          return _buildWorkerRow(name, status, workerID);
+                                        },
+                                      );
                                     },
                                   );
-                                },
+                                }
                               );
                             },
                           ),
@@ -260,6 +366,7 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
                                 var data = doc.data() as Map<String, dynamic>;
                                 
                                 // Extract and format data
+                                String employeeName = data['leaveUserName'] ?? "Unknown";
                                 String status = data['leaveStatus'] ?? "pending";
                                 String reason = data['leaveReason'] ?? "No reason provided";
                                 DateTime date = (data['leaveDate'] as Timestamp).toDate();
@@ -268,6 +375,7 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
                                 return ExpandableLeaveItem(
                                   docId: doc.id,
                                   title: formattedDate,
+                                  name: employeeName,
                                   reason: reason,
                                   status: status,
                                   isManager: true,
@@ -404,10 +512,18 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
           ),
         );
       case 'on-leave':
-        return const SizedBox(
+        return SizedBox(
           height: 30,
           width: 100,
-          child: Text("Unavailable"),
+          child: ElevatedButton(
+            onPressed: null, 
+            style: ElevatedButton.styleFrom(
+              disabledBackgroundColor: Colors.grey[300],
+              disabledForegroundColor: Colors.grey[700],
+              textStyle: const TextStyle(fontSize: 12),
+            ),
+            child: const Text("On-Leave"),
+          ),
         );
       default:
         return const SizedBox();
