@@ -46,6 +46,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
   double officeLat = 0.0;
   double officeLng = 0.0;
   double officeRadius = 0.0;
+  String deptName = "Loading...";
   String deptCode = "Loading...";
   String lName = "Name";
   String workerID = "Worker ID";
@@ -121,6 +122,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
           double radiusMeter = (settings['radiusMeter'] ?? 100.0).toDouble();
 
           setState(() {
+            deptName = deptDoc['deptName'];
             if (geoPoint != null) {
               officeLat = geoPoint.latitude; 
               officeLng = geoPoint.longitude;
@@ -133,6 +135,32 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
     } catch (e) {
       print("Error fetching department coordinates: $e");
     }
+  }
+
+  // --- HELPER TO FETCH SETTINGS ---
+  // Assuming 'deptCode' is available in your State class.
+  Future<Map<String, bool>> _getDepartmentSettings() async {
+    try {
+      QuerySnapshot deptSnapshot = await FirebaseFirestore.instance
+          .collection('departments')
+          .where('deptCode', isEqualTo: deptCode) 
+          .limit(1)
+          .get();
+
+      if (deptSnapshot.docs.isNotEmpty) {
+        var data = deptSnapshot.docs.first.data() as Map<String, dynamic>;
+        if (data.containsKey('attendanceSettings')) {
+          var settings = data['attendanceSettings'] as Map<String, dynamic>;
+          return {
+            'requireGPS': settings['requireGPS'] ?? true, // Default to true for security
+            'requireFace': settings['requireFace'] ?? true,
+          };
+        }
+      }
+    } catch (e) {
+      debugPrint("Error fetching dept settings: $e");
+    }
+    return {'requireGPS': true, 'requireFace': true}; // Fallback to strict mode if error
   }
 
   // Ensure Data Persistency
@@ -165,32 +193,6 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
         }
       }
     }
-  }
-
-  // --- HELPER TO FETCH SETTINGS ---
-  // Assuming 'deptCode' is available in your State class.
-  Future<Map<String, bool>> _getDepartmentSettings() async {
-    try {
-      QuerySnapshot deptSnapshot = await FirebaseFirestore.instance
-          .collection('departments')
-          .where('deptCode', isEqualTo: deptCode) 
-          .limit(1)
-          .get();
-
-      if (deptSnapshot.docs.isNotEmpty) {
-        var data = deptSnapshot.docs.first.data() as Map<String, dynamic>;
-        if (data.containsKey('attendanceSettings')) {
-          var settings = data['attendanceSettings'] as Map<String, dynamic>;
-          return {
-            'requireGPS': settings['requireGPS'] ?? true, // Default to true for security
-            'requireFace': settings['requireFace'] ?? true,
-          };
-        }
-      }
-    } catch (e) {
-      debugPrint("Error fetching dept settings: $e");
-    }
-    return {'requireGPS': true, 'requireFace': true}; // Fallback to strict mode if error
   }
 
   DateTime? safeConvertToDateTime(dynamic value) {
@@ -265,7 +267,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
                 Expanded(
                   flex: 9,
                   child: Text(
-                    "Hi, Worker $lName", 
+                    "$deptName: Worker", 
                     textAlign: TextAlign.center,
                     style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
                 ),
@@ -333,6 +335,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
                     .collection('shifts')
                     .where('shiftUserID', isEqualTo: workerID)
                     .where('shiftStatus', isEqualTo: 'pending') // Only count those needing action
+                    .where('shiftDate', isGreaterThanOrEqualTo: Timestamp.fromDate(DateTime.now()))
                     .snapshots(),
                 builder: (context, snapshot) {
                   // 1. Handle Loading State
@@ -854,7 +857,6 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
   Widget _buildShiftScheduleCard(String date, String clockIn, String clockOut, String location) {
     return Container(
       width: double.infinity, // Fixed width for horizontal scrolling
-      margin: const EdgeInsets.only(right: 15),
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
         color: Colors.white,

@@ -17,21 +17,8 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
   final Color bgLightBlue = const Color.fromARGB(255, 240, 250, 255);
   int? _expandedIndex;
   String _selectedPeriod = "Weekly";
-  
-  Stream<QuerySnapshot>? _attendanceStream;
 
   final Map<String, TextEditingController> _reasonControllers = {};
-  
-  @override
-  void initState() {
-    super.initState();
-    // Initialize the stream once so it doesn't "restart" on every setState
-    _attendanceStream = FirebaseFirestore.instance
-        .collection('attendances')
-        .where('deptCode', isEqualTo: widget.deptCode)
-        .orderBy('attendanceDate', descending: true)
-        .snapshots();
-  }
 
   @override
   void dispose() {
@@ -44,110 +31,121 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2, // Number of tabs
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text("Manage Reports"),
-          centerTitle: true,
-          backgroundColor: primaryBlue,
-          foregroundColor: Colors.white,
-          bottom: const TabBar(
-            indicatorColor: Colors.white,
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white70,
-            tabs: [
-              Tab(icon: Icon(Icons.assignment_ind), text: "Attendance"),
-              Tab(icon: Icon(Icons.bar_chart), text: "Reports"),
-            ],
-          ),
-        ),
-        body: SafeArea(
-          child: TabBarView(
-            children: [
-              // --- LEFT TAB: ATTENDANCE LOG ---
-              _buildAttendanceTab(),
-          
-              // --- RIGHT TAB: REPORT (PLACEHOLDER) ---
-              _buildReportsTab(),
-            ],
-          ),
+    DateTime startDate = _getStartTime(_selectedPeriod);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Manage Attendance"),
+        centerTitle: true,
+        backgroundColor: primaryBlue,
+        foregroundColor: Colors.white,
+      ),
+      backgroundColor: bgLightBlue,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 1. The Period Toggle
+            _buildPeriodToggle(),
+            
+            const Padding(
+              padding: EdgeInsets.only(left: 20, top: 10),
+              child: Text("Attendance Log:", 
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            ),
+
+            // 2. The Stream that handles both the List and the Export Button
+            Expanded(
+              child: StreamBuilder<QuerySnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('attendances')
+                    .where('deptCode', isEqualTo: widget.deptCode)
+                    .where('attendanceDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+                    .orderBy('attendanceDate', descending: true)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    debugPrint("Firestore Error: ${snapshot.error}");
+                    return const Center(child: Text("Something went wrong. Check console for Index URL."));
+                  }
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  final docs = snapshot.data?.docs ?? [];
+
+                  return Column(
+                    children: [
+                      // --- The List Container ---
+                      Expanded(
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(15),
+                            border: Border.all(color: const Color(0xFF1A3E88), width: 2),
+                          ),
+                          child: Column(
+                            children: [
+                              _buildCustomHeader(),
+                              const Divider(height: 1, color: Color(0xFF1A3E88)),
+                              
+                              Expanded(
+                                child: docs.isEmpty 
+                                  ? const Center(child: Text("No records found for this period."))
+                                  : ListView.separated(
+                                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                                      itemCount: docs.length,
+                                      separatorBuilder: (context, index) => const Divider(),
+                                      itemBuilder: (context, index) {
+                                        return _buildExpandableAttendanceRow(docs[index], index);
+                                      },
+                                  ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      // --- 3. The Export Button ---
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            icon: const Icon(Icons.picture_as_pdf),
+                            label: const Text("Export Attendance Records", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: primaryBlue,
+                              side: BorderSide(width: 2, color: primaryBlue),
+                              padding: const EdgeInsets.all(15),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))
+                            ),
+                            onPressed: () {
+                              if (docs.isEmpty) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text("No data available to export.")),
+                                );
+                                return;
+                              }
+                              PdfExportService.exportAttendanceReport(
+                                title: "Department Attendance Report",
+                                docs: docs,
+                                period: _selectedPeriod,
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       ),
-    );
-  }
-
-  Widget _buildAttendanceTab() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: attendanceFilter(),
-        ),
-        const Padding(
-          padding: EdgeInsets.only(left: 20, top: 10),
-          child: Text("Attendance Log:", 
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        ),
-        
-        // The Styled List Container
-        Expanded(
-          child: Container(
-            margin: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(15),
-              border: Border.all(color: const Color(0xFF1A3E88), width: 2),
-            ),
-            child: Column(
-              children: [
-                // Fixed Header Row
-                _buildCustomHeader(),
-                const Divider(height: 1, color: Color(0xFF1A3E88)),
-                
-                // Scrollable List of Attendance
-                Expanded(
-                  child: StreamBuilder<QuerySnapshot>(
-                    stream: _attendanceStream,
-                    builder: (context, snapshot) {
-                      if (snapshot.hasError) {
-                        debugPrint("Firestore Error: ${snapshot.error}");
-                        return const Center(child: Text("Something went wrong"));
-                      }
-                      if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-                      if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                        return const Center(child: Text("No attendance logs found for this department."));
-                      }
-
-                      return ListView.separated(
-                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-                        itemCount: snapshot.data!.docs.length,
-                        separatorBuilder: (context, index) => const Divider(),
-                        itemBuilder: (context, index) {
-                          var doc = snapshot.data!.docs[index];
-                          var data = doc.data() as Map<String, dynamic>;
-                          DateTime recordDate;
-                          if (data['attendanceDate'] != null && data['attendanceDate'] is Timestamp) {
-                            recordDate = (data['attendanceDate'] as Timestamp).toDate();
-                          } else {
-                            recordDate = DateTime.now(); 
-                          }
-
-                          // Pass these strings to your row widget
-                          return _buildExpandableAttendanceRow(doc, index);
-                        },
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
     );
   }
 
@@ -157,7 +155,6 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
       child: const Row(
         children: [
-          //TODO: change from ID to checkbox
           Expanded(flex: 3, child: Center(child: Text("Date", style: TextStyle(fontWeight: FontWeight.bold)))),
           Expanded(flex: 3, child: Center(child: Text("Worker", style: TextStyle(fontWeight: FontWeight.bold)))),
           Expanded(flex: 2, child: Center(child: Text("Status", style: TextStyle(fontWeight: FontWeight.bold)))),
@@ -171,7 +168,6 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
   Widget _buildExpandableAttendanceRow(DocumentSnapshot doc, int index) {
     Map<String, dynamic> attendance = doc.data() as Map<String, dynamic>;
 
-    // --- 1. Data Parsing ---
     DateTime? day = attendance['attendanceDate'] is Timestamp ? (attendance['attendanceDate'] as Timestamp).toDate() : null;
     DateTime? start = attendance['attendanceStartTime'] is Timestamp ? (attendance['attendanceStartTime'] as Timestamp).toDate() : null;
     DateTime? end = attendance['attendanceEndTime'] is Timestamp ? (attendance['attendanceEndTime'] as Timestamp).toDate() : null;
@@ -188,7 +184,6 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
       formattedDuration = "In Progress";
     }
 
-    // --- 2. State Logic Variables ---
     String status = attendance['attendanceApproval']?.toString() ?? 'Pending';
     String workerName = attendance['attendanceUserName']?.toString() ?? 'Unknown';
     String? approvalReason = attendance.containsKey('approvalReason') ? attendance['approvalReason'] : null;
@@ -214,7 +209,6 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
         ),
         child: Column(
           children: [
-            // Basic Info Row
             Row(
               children: [
                 Expanded(flex: 3, child: Center(child: Text(formattedDate))),
@@ -224,7 +218,6 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      // Punctuality Status (The one calculated by auth_service)
                       Text(
                         attendance['attendanceStatus'] ?? 'Unscheduled',
                         style: TextStyle(
@@ -233,9 +226,8 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
                           color: attendance['attendanceStatus'] == "Late" ? Colors.red : Colors.blue,
                         ),
                       ),
-                      // Approval Status (The one the manager clicks)
                       Text(
-                        status, // Your existing 'Pending/Approved' variable
+                        status, 
                         style: TextStyle(
                           fontSize: 10,
                           color: status == "Approved" ? Colors.green : Colors.grey,
@@ -251,7 +243,7 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
             if (isExpanded) ...[
               const Divider(height: 20),
               Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch, // Stretch items to fill width
+                crossAxisAlignment: CrossAxisAlignment.stretch, 
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -263,7 +255,6 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
                   ),
                   const SizedBox(height: 12),
 
-                  // --- STATE 1: PENDING ---
                   if (status == 'Pending') ...[
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -274,8 +265,6 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
                       ],
                     ),
                   ]
-
-                  // --- STATE 2: EDITING (Status defined, but no reason given yet) ---
                   else if (status != 'Pending' && approvalReason == null) ...[
                     TextField(
                       controller: _reasonControllers[doc.id],
@@ -309,18 +298,16 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
                       ],
                     ),
                   ]
-
-                  // --- STATE 3: LOCKED (Status defined AND reason exists) ---
                   else if (status != 'Pending' && approvalReason != null) ...[
                     TextField(
-                      controller: TextEditingController(text: approvalReason), // Show the saved reason
-                      enabled: false, // Locks the text field
+                      controller: TextEditingController(text: approvalReason), 
+                      enabled: false, 
                       decoration: InputDecoration(
                         labelText: 'Reason for change to $status (Locked)',
-                        border: OutlineInputBorder(),
+                        border: const OutlineInputBorder(),
                         isDense: true,
                       ),
-                      style: const TextStyle(color: Colors.black87), // Ensures text is readable when disabled
+                      style: const TextStyle(color: Colors.black87), 
                     ),
                     const SizedBox(height: 8),
                     const Center(
@@ -351,113 +338,12 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
     );
   }
 
-  // --- STUBS FOR YOUR EXISTING WIDGETS ---
-  Widget attendanceFilter() {
-    return const Row(children: [Icon(Icons.filter_list), SizedBox(width: 5), Text("Filter")]);
-  }
-
-  Widget _buildReportsTab() {
-  DateTime startDate = _getStartTime(_selectedPeriod);
-  
-  return SingleChildScrollView(
-    padding: const EdgeInsets.symmetric(horizontal: 20),
-    child: Column(
-      children: [
-        _buildPeriodToggle(), // Moved to the TOP, outside the Stream
-
-        const SizedBox(height: 20),
-        
-        StreamBuilder<QuerySnapshot>(
-          stream: FirebaseFirestore.instance
-              .collection('attendances')
-              .where('deptCode', isEqualTo: widget.deptCode)
-              .where('attendanceDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
-              .snapshots(),
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-            
-            final docs = snapshot.data!.docs;
-            if (docs.isEmpty) return const Center(child: Text("No records found."));
-            
-            // 1. Logic: Extract counts into a Map for cleaner access
-            final stats = _calculateStats(docs);
-            
-            // 2. UI: Return a scrollable view of pre-made components
-            return Column(
-              children: [
-                // --- Section 1: Status ---
-                Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  alignment: WrapAlignment.center,
-                  children: [
-                    // Access the values using the keys defined in the Map
-                    _buildStatChip("Total", "${stats['total']}", Colors.blue),
-                    _buildStatChip("On-Time", "${stats['onTime']}", Colors.green),
-                    _buildStatChip("Late", "${stats['late']}", Colors.red),
-                    _buildStatChip("Other", "${stats['unscheduled']}", Colors.orange),
-                  ],
-                ),
-                const SizedBox(height: 20),
-            
-                // --- Section 2: Chart ---
-                _buildSimpleBarChart(stats['onTime']!, stats['late']!),
-
-                const SizedBox(height: 20),
-            
-                // --- Section 3: Absent List ---
-                const Text("Today's Missing Staff", 
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87)),
-                
-                const SizedBox(height: 10),
-                
-                _buildAbsentReportSection(),
-
-                const SizedBox(height: 10),
-
-                // --- Section 4: Export Button ---
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.picture_as_pdf),
-                  label: const Text("Export Department Report", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: bgLightBlue,
-                    foregroundColor: primaryBlue,
-                    side: BorderSide(width: 2, color: primaryBlue),
-                    padding: EdgeInsets.all(20)),
-                  onPressed: () {
-                    if (docs.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("No data available for the selected period.")),
-                      );
-                      return;
-                    }
-                    PdfExportService.exportAttendanceReport(
-                      title: "Department Attendance Report",
-                      docs: docs, // This is the 'docs' variable from your StreamBuilder
-                      period: _selectedPeriod,
-                    );
-                  },
-                ),
-              ],
-            );
-          },
-        ),
-      ],
-    ),
-  );
-}
-
-  void onChanged(bool? value) {}
-  
-  // Added 'String? reason' parameter
   Future<void> _updateAttendanceStatus(String docId, String newStatus, String? reason) async {
     try {
-      // Build the data to update dynamically
       Map<String, dynamic> updateData = {
         'attendanceApproval': newStatus,
       };
 
-      // If a reason is provided (State 2), add it to the database
       if (reason != null) {
         updateData['approvalReason'] = reason;
       }
@@ -467,15 +353,13 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
           .doc(docId)
           .update(updateData);
 
-      // If we just saved a reason, clear the text field controller
       if (reason != null && _reasonControllers.containsKey(docId)) {
         _reasonControllers[docId]!.clear();
       }
 
-      // Show a small confirmation to the manager
       if (mounted) {
         setState(() {
-          _expandedIndex = null; // Step 2: Auto-collapse after action
+          _expandedIndex = null; 
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -498,123 +382,36 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
   DateTime _getStartTime(String period) {
     DateTime now = DateTime.now();
     switch (period) {
+      case "All":
+        return DateTime(2000, 1, 1);
       case "Weekly":
-        // Gets the start of the current week (Monday)
-        return now.subtract(Duration(days: now.weekday - 1)).copyWith(hour: 0, minute: 0, second: 0);
+        DateTime startOfWeek = now.subtract(Duration(days: now.weekday - 1))
+            .copyWith(hour: 0, minute: 0, second: 0, millisecond: 0, microsecond: 0);
+        return startOfWeek;
       case "Monthly":
-        // Gets the 1st day of the current month
         return DateTime(now.year, now.month, 1);
       case "Yearly":
-        // Gets Jan 1st of the current year
         return DateTime(now.year, 1, 1);
       default:
         return now;
     }
   }
 
-  Widget _buildStatChip(String label, String value, Color color) {
-    // Calculates width to fit 2 chips per row comfortably
-    double cardWidth = (MediaQuery.of(context).size.width / 4) - 20;
-
-    return Container(
-      width: cardWidth,
-      padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 5),
-      decoration: BoxDecoration(
-        color: bgLightBlue,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.5), width: 5),
-        boxShadow: [
-          BoxShadow(color: color.withOpacity(0.05), blurRadius: 5, offset: const Offset(0, 2))
-        ],
-      ),
-      child: Column(
-        children: [
-          Text(value, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: color)),
-          Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey[600])),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSimpleBarChart(int onTime, int late) {
-    int total = onTime + late;
-    // Prevent division by zero
-    double onTimeWidth = total == 0 ? 0.5 : (onTime / total);
-    double lateWidth = total == 0 ? 0.5 : (late / total);
-
-    return Column(
-      children: [
-        const Text("Punctuality Distribution", 
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-        Container(
-          margin: const EdgeInsets.all(10),
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: Colors.grey[50],
-            border: Border.all(color: primaryBlue, width: 2),
-            borderRadius: BorderRadius.circular(15),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Legend
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildLegendItem("On-Time", Colors.green, "${(onTimeWidth * 100).toInt()}%"),
-                  _buildLegendItem("Late", Colors.orange, "${(lateWidth * 100).toInt()}%"),
-                ],
-              ),
-              
-              const SizedBox(height: 10),
-              
-              // The actual Bar
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: Row(
-                  children: [
-                    // On-Time Segment
-                    Expanded(
-                      flex: (onTimeWidth * 100).toInt().clamp(1, 100),
-                      child: Container(height: 30, color: Colors.green),
-                    ),
-                    // Late Segment
-                    Expanded(
-                      flex: (lateWidth * 100).toInt().clamp(1, 100),
-                      child: Container(height: 30, color: Colors.orange),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildLegendItem(String label, Color color, String percentage) {
-    return Row(
-      children: [
-        Container(width: 12, height: 12, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-        const SizedBox(width: 8),
-        Text("$label ($percentage)", style: const TextStyle(fontSize: 14, color: Colors.black87)),
-      ],
-    );
-  }
-
   Widget _buildPeriodToggle() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
       child: SizedBox(
-        width: double.infinity, // 1. Force the container to full width
+        width: double.infinity, 
         child: SegmentedButton<String>(
-          // 2. Hide the check icon to keep label centering consistent
           showSelectedIcon: false, 
           segments: const [
             ButtonSegment(
+              value: "All", 
+              label: Center(child: Text("All")),
+            ),
+            ButtonSegment(
               value: "Weekly", 
-              label: Center(child: Text("Week")), // 3. Wrap label in Center
+              label: Center(child: Text("Week")), 
             ),
             ButtonSegment(
               value: "Monthly", 
@@ -634,175 +431,12 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
           style: SegmentedButton.styleFrom(
             selectedBackgroundColor: primaryBlue,
             selectedForegroundColor: bgLightBlue,
-            // 4. Ensure visual density is tight
             visualDensity: VisualDensity.comfortable,
             side: const BorderSide(width: 1, color: Colors.grey),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           ),
         ),
       ),
-    );
-  }
-
-  Map<String, int> _calculateStats(List<QueryDocumentSnapshot> docs) {
-    int onTime = 0;
-    int late = 0;
-    int unscheduled = 0;
-
-    for (var doc in docs) {
-      // 1. Safely extract the data
-      final data = doc.data() as Map<String, dynamic>;
-      
-      // 2. Get the status string (default to Unscheduled if null)
-      final String status = data['attendanceStatus']?.toString() ?? 'Unscheduled';
-
-      // 3. Increment the correct counter in one single loop
-      switch (status) {
-        case 'On-Time':
-          onTime++;
-          break;
-        case 'Late':
-          late++;
-          break;
-        default:
-          unscheduled++;
-          break;
-      }
-    }
-
-    // 4. Return everything in a tidy Map
-    return {
-      'onTime': onTime,
-      'late': late,
-      'unscheduled': unscheduled,
-      'total': docs.length,
-    };
-  }
-
-  Widget _buildAbsentReportSection() {
-    DateTime now = DateTime.now();
-    DateTime todayStart = DateTime(now.year, now.month, now.day);
-    DateTime tomorrowStart = todayStart.add(const Duration(days: 1));
-
-    return StreamBuilder<QuerySnapshot>(
-      // Fetch today's shifts
-      stream: FirebaseFirestore.instance
-          .collection('shifts')
-          .where('deptCode', isEqualTo: widget.deptCode)
-          .where('shiftStatus', isEqualTo: 'accepted')
-          .where('shiftDate', isGreaterThanOrEqualTo: Timestamp.fromDate(todayStart))
-          .where('shiftDate', isLessThan: Timestamp.fromDate(tomorrowStart))
-          .snapshots(),
-      builder: (context, shiftSnapshot) {
-        if (!shiftSnapshot.hasData)
-          print(shiftSnapshot.error);
-
-        return StreamBuilder<QuerySnapshot>(
-          // Fetch today's attendances
-          stream: FirebaseFirestore.instance
-              .collection('attendances')
-              .where('deptCode', isEqualTo: widget.deptCode)
-              .where('attendanceDate', isGreaterThanOrEqualTo: Timestamp.fromDate(todayStart))
-              .snapshots(),
-          builder: (context, attendanceSnapshot) {
-            if (!attendanceSnapshot.hasData) return const SizedBox();
-
-            // Compare UIDs
-            final presentUIDs = attendanceSnapshot.data!.docs
-                .map((doc) => (doc.data() as Map<String, dynamic>)['uid'].toString())
-                .toSet();
-
-            final absentDocs = shiftSnapshot.data!.docs.where((shiftDoc) {
-              final shiftData = shiftDoc.data() as Map<String, dynamic>;
-              return !presentUIDs.contains(shiftData['shiftUserID']);
-            }).toList();
-
-            if (absentDocs.isEmpty) {
-              return Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(15),
-                decoration: BoxDecoration(color: Colors.green.withOpacity(0.05), borderRadius: BorderRadius.circular(10)),
-                child: const Text("✨ Everyone has reported for duty today.", 
-                  style: TextStyle(color: Colors.green, fontSize: 13)),
-              );
-            }
-
-            // THE REPORT TABLE STYLE
-            return Container(
-              margin: const EdgeInsets.all(10),
-              padding: const EdgeInsets.all(5),
-              decoration: BoxDecoration(
-                color: Colors.grey[50],
-                border: Border.all(color: primaryBlue, width: 2),
-                borderRadius: BorderRadius.circular(15),
-              ),
-              child: Column(
-                children: [
-                  // Minimalist Table Header
-                  Container(
-                    padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 15),
-                    decoration: BoxDecoration(color: bgLightBlue, borderRadius: BorderRadius.circular(15),),
-                    child: const Row(
-                      children: [
-                        Expanded(flex: 3, child: Text("Date", textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14))),
-                        Expanded(flex: 3, child: Text("Name", textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14))),
-                        Expanded(flex: 2, child: Text("Shift Start", textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14))),
-                        Expanded(flex: 2, child: Text("Status", textAlign: TextAlign.center, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14))),
-                      ],
-                    ),
-                  ),
-                  // Table Rows
-                  ...absentDocs.map((doc) {
-                    final data = doc.data() as Map<String, dynamic>;
-                    String time = data['shiftStartTime'] != null 
-                      ? DateFormat.jm().format((data['shiftStartTime'] as Timestamp).toDate()) 
-                      : "--";
-                    String date = data['shiftDate'] != null 
-                      ? DateFormat('dd MMM yyyy').format((data['shiftDate'] as Timestamp).toDate())
-                      : "--";
-                    
-                    return Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 15),
-                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(15),),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            flex: 3,
-                            child: Text(
-                              date,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(fontSize: 14))),
-                          Expanded(
-                            flex: 3,
-                            child: Text(
-                              data['shiftUserName'] ?? "Unknown",
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(fontSize: 14))),
-                          Expanded(
-                            flex: 2,
-                            child: Text(
-                              time,
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(fontSize: 14))),
-                          const Expanded(
-                            flex: 2,
-                            child: Text(
-                              "Absent",
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold, 
-                                fontSize: 14, 
-                                color: Colors.red))),
-                        ],
-                      ),
-                    );
-                  }),
-                ],
-              ),
-            );
-          },
-        );
-      },
     );
   }
 }

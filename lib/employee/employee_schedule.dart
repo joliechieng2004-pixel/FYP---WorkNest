@@ -18,34 +18,43 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
   // often use colors
   final Color primaryBlue = const Color.fromARGB(255, 40, 75, 158);
   final Color bgLightBlue = const Color.fromARGB(255, 240, 250, 255);
-
-  // Calendar
-  CalendarFormat _calendarFormat = CalendarFormat.month;
-  DateTime _focusedDay = DateTime.now();
-  DateTime? _selectedDay;
-  bool _isDateSelected = false;
   
   final TextEditingController _leaveController = TextEditingController();
   final ScrollController _leaveScrollController = ScrollController();
+  final ScrollController _shiftScrollController = ScrollController();
   String deptCode = "Loading...";
+  
   String formattedDate = DateFormat('EEEE, d MMM yyyy').format(DateTime.now());
   String formattedTime = DateFormat('h:mm a').format(DateTime.now());
-  Stream<QuerySnapshot>? _shiftStream;
+  
+  Stream<QuerySnapshot>? _allShiftStream;
 
   // --- INITIALIZATION ---
   @override
   void initState() {
     super.initState();
-    _selectedDay = DateTime.now(); // Default selection to today
-    _focusedDay = DateTime.now();
-    _isDateSelected = true;
-    _updateStream(_selectedDay!);
+    _updateStream();
+  }
+
+  void _updateStream() {
+    DateTime date = DateTime.now();
+    DateTime startOfToday = DateTime(date.year, date.month, date.day, 0, 0, 0);
+
+    setState(() {
+      _allShiftStream = FirebaseFirestore.instance
+          .collection('shifts')
+          .where('shiftUserID', isEqualTo: widget.workerID)
+          .where('shiftDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfToday))
+          .orderBy('shiftDate', descending: false)
+          .snapshots();
+    });
   }
 
   @override
   void dispose() {
     _leaveController.dispose();
-    _leaveScrollController.dispose(); // Clean up the controller
+    _leaveScrollController.dispose();
+    _shiftScrollController.dispose();
     super.dispose(); 
   }
 
@@ -66,83 +75,10 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // 1. Calendar
-              Card(
-                margin: const EdgeInsets.all(10),
-                elevation: 4,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                child: TableCalendar(
-                  firstDay: DateTime.now().subtract(const Duration(days: 0)),
-                  lastDay: DateTime.utc(2030, 12, 31),
-                  focusedDay: _focusedDay,
-                  calendarFormat: _calendarFormat,
-                  enabledDayPredicate: (day) {
-                    // Only allow dates that are today or in the future
-                    final now = DateTime.now();
-                    final today = DateTime(now.year, now.month, now.day);
-                    return day.isAfter(today.subtract(const Duration(days: 1)));
-                  },
-                  selectedDayPredicate: (day) {
-                    // Tells the calendar which day to highlight as "selected"
-                    return isSameDay(_selectedDay, day);
-                  },
-                  onDaySelected: (selectedDay, focusedDay) {
-                    setState(() {
-                      _selectedDay = selectedDay;
-                      _focusedDay = focusedDay; // update focusedDay as well
-                      _isDateSelected = true;
-                    });
-                    _updateStream(selectedDay);
-                  },
-                  onFormatChanged: (format) {
-                    setState(() {
-                      _calendarFormat = format;
-                    });
-                  },
-                  // Custom Styling
-                  calendarStyle: const CalendarStyle(
-                    todayDecoration: BoxDecoration(color: Colors.blueAccent, shape: BoxShape.circle),
-                    selectedDecoration: BoxDecoration(color: Color(0xFF1A3E88), shape: BoxShape.circle),
-                    markerDecoration: BoxDecoration(color: Colors.red, shape: BoxShape.circle), // For shifts
-                  ),
-                  headerStyle: const HeaderStyle(
-                    formatButtonVisible: true,
-                    titleCentered: true,
-                  ),
-                ),
-              ),
-
-              // 2. Shift List for Employee
-              _isDateSelected
-                  ? StreamBuilder<QuerySnapshot>(
-                      stream: _shiftStream,
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          return const Center(child: CircularProgressIndicator());
-                        }
-
-                        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                          return _buildEmptyShiftWithLeave();
-                        }
-
-                        // Get the shift data
-                        var shiftDoc = snapshot.data!.docs.first;
-                        var shiftData = shiftDoc.data() as Map<String, dynamic>;
-                        String shiftID = shiftDoc.id;
-                        String status = shiftData['shiftStatus'] ?? 'pending';
-
-                        return _buildEmployeeShiftCard(shiftData, shiftID, status);
-                      },
-                    )
-                  : _buildCard(
-                      color: bgLightBlue,
-                      child: const Center(child: Text("Select a date to view your shift")),
-                    ),
-
-              // 3. Shift Summary
+              // 1. Shift Summary
               _buildCard(
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     const Text(
                       "Shift Summary",
@@ -181,6 +117,80 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
                           .where('shiftStatus', isEqualTo: 'accepted')
                           .where('shiftDate', isGreaterThanOrEqualTo: Timestamp.fromDate(DateTime.now()))
                           .snapshots(),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 10),
+
+              // 2. Request Leave Button
+              _buildGlobalLeaveRequestCard(),
+
+              const SizedBox(height: 10),
+
+              // 3. Shift List for Employee
+              _buildCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Center(
+                      child: Text(
+                        "Upcoming Shifts",
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    const Divider(color: Color(0xFF1A3E88)),
+                    const SizedBox(height: 10),
+                    
+                    SizedBox(
+                      height: 300, // Matches your Leave Request list height
+                      child: Scrollbar(
+                        controller: _shiftScrollController,
+                        thumbVisibility: true, 
+                        child: StreamBuilder<QuerySnapshot>(
+                          // Stream: Future shifts only, ordered by date (closest first)
+                          stream: FirebaseFirestore.instance
+                              .collection('shifts')
+                              .where('shiftUserID', isEqualTo: widget.workerID)
+                              .where('shiftDate', isGreaterThanOrEqualTo: Timestamp.fromDate(
+                                  DateTime.now().subtract(const Duration(hours: 1)))) // Current & Future
+                              .orderBy('shiftDate', descending: false) 
+                              .snapshots(),
+                          builder: (context, snapshot) {
+                            if (snapshot.hasError) {
+                              print("Shift Stream Error: ${snapshot.error}");
+                              return const Center(child: Text("Error loading shifts"));
+                            }
+                            if (snapshot.connectionState == ConnectionState.waiting) {
+                              return const Center(child: CircularProgressIndicator());
+                            }
+
+                            final shiftDocs = snapshot.data?.docs ?? [];
+
+                            if (shiftDocs.isEmpty) {
+                              return const Center(
+                                child: Text("No upcoming shifts found.", 
+                                style: TextStyle(color: Colors.grey))
+                              );
+                            }
+
+                            return ListView.builder(
+                              controller: _shiftScrollController,
+                              padding: const EdgeInsets.only(right: 10),
+                              itemCount: shiftDocs.length,
+                              itemBuilder: (context, index) {
+                                var doc = shiftDocs[index];
+                                var data = doc.data() as Map<String, dynamic>;
+                                String status = data['shiftStatus'] ?? 'pending';
+                                
+                                // Return the updated card/tile logic
+                                return _buildEmployeeShiftCard(data, doc.id, status);
+                              },
+                            );
+                          },
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -312,127 +322,327 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
         ? "${DateFormat.jm().format(startVal)} - ${DateFormat.jm().format(endVal)}"
         : "Time Not Set";
 
-    return _buildCard(
-      color: Colors.white,
-      child: Column(
-        children: [
-          const Text(
-            "Shift Details",
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-          const Divider(color: Color(0xFF1A3E88)),
-          const SizedBox(height: 10),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Left side: Shift Details
-              Expanded(
-                flex: 7,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(dateStr, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                    const SizedBox(height: 8),
-                    Text(timeRange, style: const TextStyle(fontSize: 15)),
-                    const SizedBox(height: 8),
-                    Text("Location: ${data['shiftLocation'] ?? 'Workplace'}", style: const TextStyle(color: Colors.grey)),
-                    if (data['shiftTask'] != null) ...[
-                      const SizedBox(height: 8),
-                      Text("Task: ${data['shiftTask']}", style: const TextStyle(fontStyle: FontStyle.italic)),
-                    ]
-                  ],
-                ),
-              ),
-
-              // Right side: Action Logic
-              Expanded(
-                flex: 3,
-                child: Column(
-                  children: [
-                    if (status == 'accepted') 
-                      // 1. If accepted, buttons disappear (Show nothing or a small badge)
-                      const Icon(Icons.check_circle, color: Colors.green, size: 40)
-                    
-                    else if (status == 'rejected') ...[
-                      const Icon(Icons.cancel, color: Colors.red, size: 40)
-                    ] 
-                    
-                    else ...[
-                      // 3. If pending, both buttons trigger the confirmation dialog first
-                      _buildActionButton(
-                        "Accept", 
-                        Colors.green, 
-                        () => _showStatusConfirmation(docID, 'accepted'), // Changed
-                        false
-                      ),
-                      const SizedBox(height: 10),
-                      _buildActionButton(
-                        "Reject", 
-                        Colors.red, 
-                        () => _showStatusConfirmation(docID, 'rejected'), // Changed
-                        false
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ]
-          ),
-          const Divider(height: 30),
-          
-          _buildRequestLeaveButton({
-            'shiftDate': Timestamp.fromDate(_selectedDay!),
-            'shiftLocation': 'N/A',
-          }),
-        ],
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.shade200),
       ),
-    );
-  }
-
-  Widget _buildEmptyShiftWithLeave() {
-    return _buildCard(
-      color: Colors.white,
-      child: Column(
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Center(
-            child: Text(
-                "Shift Details",
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
+          // Left side: Shift Details
+          Expanded(
+            flex: 7,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(dateStr, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const SizedBox(height: 8),
+                Text(timeRange, style: const TextStyle(fontSize: 15)),
+                const SizedBox(height: 8),
+                if (data['shiftTask'] != null) ...[
+                  const SizedBox(height: 8),
+                  Text("Task: ${data['shiftTask']}", style: const TextStyle(fontStyle: FontStyle.italic)),
+                ]
+              ],
+            ),
           ),
-          const Divider(color: Color(0xFF1A3E88)),
-          const SizedBox(height: 10),
-          const Row(
-            children: [
-              Icon(Icons.event_busy, size: 50, color: Colors.grey),
-              SizedBox(width: 10),
-              Text("No shift assigned for this date.", style: TextStyle(color: Colors.grey, fontSize: 15)),
-            ],
+
+          // Right side: Action Logic
+          Expanded(
+            flex: 3,
+            child: Column(
+              children: [
+                if (status == 'accepted') 
+                  // 1. If accepted, buttons disappear (Show nothing or a small badge)
+                  const Icon(Icons.check_circle, color: Colors.green, size: 40)
+                
+                else if (status == 'rejected') ...[
+                  const Icon(Icons.cancel, color: Colors.red, size: 40)
+                ] 
+                
+                else ...[
+                  // 3. If pending, both buttons trigger the confirmation dialog first
+                  _buildActionButton(
+                    "Accept", 
+                    Colors.green, 
+                    () => _showStatusConfirmation(docID, 'accepted'), // Changed
+                    false
+                  ),
+                  const SizedBox(height: 10),
+                  _buildActionButton(
+                    "Reject", 
+                    Colors.red, 
+                    () => _showStatusConfirmation(docID, 'rejected'), // Changed
+                    false
+                  ),
+                ],
+              ],
+            ),
           ),
-          const Divider(height: 30),
-          
-          // The button is now here too!
-          _buildRequestLeaveButton({
-            'shiftDate': Timestamp.fromDate(_selectedDay!),
-            'shiftLocation': 'N/A',
-          }),
-        ],
+        ]
       ),
     );
   }
 
-  Widget _buildRequestLeaveButton(Map<String, dynamic> data) {
-    return OutlinedButton.icon(
-      onPressed: () => _handleLeaveRequest(data),
-      icon: const Icon(Icons.beach_access, size: 18),
-      label: const Text("Request Leave"),
-      style: OutlinedButton.styleFrom(
-        minimumSize: const Size(double.infinity, 45),
-        side: const BorderSide(color: Colors.black),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        foregroundColor: Colors.black,
+  // --- NEW WIDGET: Global Leave Request Card ---
+  Widget _buildGlobalLeaveRequestCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(10),
+      margin: const EdgeInsets.symmetric(vertical: 10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: primaryBlue, width: 2),
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.blueGrey,
+            blurRadius: 10,
+            offset: Offset(2, 4),
+          ),
+        ],
       ),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            const Row(
+              children: [
+                Icon(Icons.event_note, color: Colors.orange, size: 28),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    "Need time off? Select a date to request leave.",
+                    style: TextStyle(fontSize: 14),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 15),
+            ElevatedButton.icon(
+              onPressed: () => _selectDateAndRequestLeave(context),
+              icon: const Icon(Icons.beach_access, size: 18),
+              label: const Text("Select Date & Request Leave"),
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 45),
+                backgroundColor: primaryBlue,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // NEW: Global Date Picker Logic for Leave Request
+  Future<void> _selectDateAndRequestLeave(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now(), // Prevents picking dates in the past
+      lastDate: DateTime(2100),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: primaryBlue, // header background color
+              onPrimary: Colors.white, // header text color
+              onSurface: Colors.black, // body text color
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null) {
+      // Create a payload to send to your existing _handleLeaveRequest function
+      Map<String, dynamic> leaveData = {
+        'shiftDate': Timestamp.fromDate(picked),
+      };
+      // Call your existing logic
+      _handleLeaveRequest(leaveData); 
+    }
+  }
+
+  // Function to trigger leave request (usually opens a dialog or new page)
+  void _handleLeaveRequest(Map<String, dynamic> shiftData) {
+    DateTime selectedLeaveDate = (shiftData['shiftDate'] as Timestamp).toDate();
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder( // Use StatefulBuilder to update time inside dialog
+        builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text("Request for a Leave", 
+            style: TextStyle(color: primaryBlue, fontSize: 18, fontWeight: FontWeight.bold)),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    "Date: ${DateFormat('dd MMM yyyy').format(selectedLeaveDate)}",
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _leaveController, 
+                  decoration: InputDecoration(
+                    labelText: "Leave Request Reason",
+                    hintText: "e.g. Sick, Family Manner",
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            // Cancel Request
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+            // Confirm Shift
+            ElevatedButton(
+              onPressed: () async {
+                if (_leaveController.text.trim().isEmpty) {
+                // Show a quick error without closing the dialog
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text("Please provide a reason")),
+                );
+                return;
+              }
+                try {
+                  // 1. Fetch workerName from users collection
+                  DocumentSnapshot userDoc = await FirebaseFirestore.instance
+                      .collection('users')
+                      .doc(widget.workerID)
+                      .get();
+
+                  debugPrint(widget.workerID);
+
+                  Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
+                  String fullName = "${userData['userFName']} ${userData['userLName']}";
+
+                  // 2. Submit with all fields
+                  await _submitLeaveToFirestore(
+                    deptCode: widget.deptCode,
+                    workerID: widget.workerID,
+                    workerName: fullName,
+                    leaveReason: _leaveController.text,
+                    leaveDate: selectedLeaveDate,
+                  );
+
+                  if (mounted) {
+                    Navigator.pop(context);
+                    _leaveController.clear();
+                    // Show success feedback
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("Leave request submitted!"),
+                        duration: Duration(seconds: 1),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  print("Error submitting leave: $e");
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: primaryBlue, foregroundColor: Colors.white),
+              child: const Text("Confirm"),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Feature - Submit Leave
+  Future<void> _submitLeaveToFirestore({
+    required String deptCode,
+    required String workerID,
+    required String workerName,
+    required String leaveReason,
+    required DateTime leaveDate,
+  }) async {
+    // 1. Create a unique document ID (e.g., "2026-03-19_worker123")
+    String dateString = DateFormat('yyyy-MM-dd').format(leaveDate);
+    String customDocId = "${dateString}_$workerID";
+
+    try {
+      // 2. Use .doc(customDocId).set() instead of .add()
+      await FirebaseFirestore.instance
+          .collection('leaves')
+          .doc(customDocId) 
+          .set({
+        'deptCode': deptCode,
+        'leaveUserID': workerID,
+        'leaveUserName': workerName,
+        'leaveDate': Timestamp.fromDate(leaveDate),
+        'leaveReason': leaveReason,
+        'leaveStatus': 'pending',
+        'leaveAppliedDate': FieldValue.serverTimestamp(), // Fixed typo from 'Datte'
+        'managerReason': null,
+      }, SetOptions(merge: true)); // Use merge to avoid wiping out other fields if they exist
+
+      print("Leave submitted with ID: $customDocId");
+    } catch (e) {
+      print("Error submitting leave: $e");
+      throw e; // Pass error back to the UI to show a SnackBar
+    }
+  }
+
+  Widget _buildShiftList() {
+    return StreamBuilder<QuerySnapshot>(
+      stream: _allShiftStream,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.all(20.0),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return _buildCard(
+            color: Colors.white,
+            child: const Padding(
+              padding: EdgeInsets.all(20.0),
+              child: Center(
+                child: Text(
+                  "No upcoming shifts assigned.",
+                  style: TextStyle(color: Colors.grey, fontSize: 16),
+                ),
+              ),
+            ),
+          );
+        }
+
+        // Use ListView.builder with shrinkWrap to work inside SingleChildScrollView
+        return ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(), // Let the parent scroll
+          itemCount: snapshot.data!.docs.length,
+          itemBuilder: (context, index) {
+            var shiftDoc = snapshot.data!.docs[index];
+            var shiftData = shiftDoc.data() as Map<String, dynamic>;
+            String shiftID = shiftDoc.id;
+            String status = shiftData['shiftStatus'] ?? 'pending';
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _buildEmployeeShiftCard(shiftData, shiftID, status),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -516,122 +726,6 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
     }
   }
 
-  // Function to trigger leave request (usually opens a dialog or new page)
-  void _handleLeaveRequest(Map<String, dynamic> shiftData) {
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder( // Use StatefulBuilder to update time inside dialog
-        builder: (context, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text("Request for a Leave", 
-            style: TextStyle(color: primaryBlue, fontSize: 18, fontWeight: FontWeight.bold)),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(DateFormat('dd MMM yyyy').format(_selectedDay!), style: const TextStyle(fontSize: 14)),
-                const SizedBox(height: 20),
-                TextField(
-                  controller: _leaveController,
-                  decoration: InputDecoration(
-                    labelText: "Leave Request Reason",
-                    hintText: "e.g. Sick, Family Manner",
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            // Cancel Request
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
-            // Confirm Shift
-            ElevatedButton(
-              onPressed: () async {
-                if (_leaveController.text.trim().isEmpty) {
-                // Show a quick error without closing the dialog
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text("Please provide a reason")),
-                );
-                return;
-              }
-                try {
-                  // 1. Fetch workerName from users collection
-                  DocumentSnapshot userDoc = await FirebaseFirestore.instance
-                      .collection('users')
-                      .doc(widget.workerID)
-                      .get();
-
-                  Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
-                  String fullName = "${userData['userFName']} ${userData['userLName']}";
-
-                  // 2. Submit with all fields
-                  await _submitLeaveToFirestore(
-                    deptCode: widget.deptCode,
-                    workerID: widget.workerID,
-                    workerName: fullName,
-                    leaveReason: _leaveController.text,
-                  );
-
-                  if (mounted) {
-                    Navigator.pop(context);
-                    _leaveController.clear();
-                    // Show success feedback
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("Leave request submitted!"),
-                        duration: Duration(seconds: 1),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                  }
-                } catch (e) {
-                  print("Error submitting leave: $e");
-                }
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: primaryBlue, foregroundColor: Colors.white),
-              child: const Text("Confirm"),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Feature - Submit Leave
-  Future<void> _submitLeaveToFirestore({
-    required String deptCode,
-    required String workerID,
-    required String workerName,
-    required String leaveReason,
-  }) async {
-    // 1. Create a unique document ID (e.g., "2026-03-19_worker123")
-    String dateString = DateFormat('yyyy-MM-dd').format(_selectedDay!);
-    String customDocId = "${dateString}_$workerID";
-
-    try {
-      // 2. Use .doc(customDocId).set() instead of .add()
-      await FirebaseFirestore.instance
-          .collection('leaves')
-          .doc(customDocId) 
-          .set({
-        'deptCode': deptCode,
-        'leaveUserID': workerID,
-        'leaveUserName': workerName,
-        'leaveDate': Timestamp.fromDate(_selectedDay!),
-        'leaveReason': leaveReason,
-        'leaveStatus': 'pending',
-        'leaveAppliedDate': FieldValue.serverTimestamp(), // Fixed typo from 'Datte'
-        'managerReason': null,
-      }, SetOptions(merge: true)); // Use merge to avoid wiping out other fields if they exist
-
-      print("Leave submitted with ID: $customDocId");
-    } catch (e) {
-      print("Error submitting leave: $e");
-      throw e; // Pass error back to the UI to show a SnackBar
-    }
-  }
-
   // Helper for Summary Rows
   Widget _buildDynamicStatRow({required String label, required Stream<QuerySnapshot> stream}) {
     return StreamBuilder<QuerySnapshot>(
@@ -674,19 +768,5 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
         );
       },
     );
-  }
-
-  void _updateStream(DateTime date) {
-    DateTime startOfDay = DateTime(date.year, date.month, date.day, 0, 0, 0);
-    DateTime endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59);
-
-    setState(() {
-      _shiftStream = FirebaseFirestore.instance
-          .collection('shifts')
-          .where('shiftUserID', isEqualTo: widget.workerID)
-          .where('shiftDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
-          .where('shiftDate', isLessThanOrEqualTo: Timestamp.fromDate(endOfDay))
-          .snapshots();
-    });
   }
 }

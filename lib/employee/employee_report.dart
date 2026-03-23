@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:worknest/services/attendance_count.dart';
 import 'package:worknest/services/pdf_service.dart';
 
 class EmployeeReport extends StatefulWidget {
@@ -60,9 +62,22 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              _buildCard(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    const Text("My Overall Attendance", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    const SizedBox(width: 10),
+                    
+                    AttendanceRateWidget(
+                      userId: FirebaseAuth.instance.currentUser!.uid, // Use the logged-in user's ID
+                    ),
+                  ],
+                )),
+
               _buildPeriodToggle(),
 
-              // Leave Requests (Scrollable Version)
+              // Timesheet
               _buildCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -192,7 +207,7 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
   Widget _buildCard({required Widget child, Color? color}) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(10),
       margin: const EdgeInsets.symmetric(vertical: 10),
       decoration: BoxDecoration(
         color: color ?? Colors.white,
@@ -235,7 +250,7 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
           Expanded(
             flex: 2,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Text(date, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
                 Text(status, style: TextStyle(color: statusColor, fontSize: 12, fontWeight: FontWeight.w600)),

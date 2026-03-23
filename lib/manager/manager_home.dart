@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:worknest/manager/manager_profile.dart';
 import 'package:worknest/manager/manager_report.dart';
 import 'package:worknest/manager/manager_schedule.dart';
@@ -26,10 +27,10 @@ class _ManagerHomePageState extends State<ManagerHome> {
 
   final ScrollController _activityScrollController = ScrollController();
   String deptCode = "Loading...";
+  String deptName = "Loading...";
   String lName = "Name";
 
-  // ignore: unused_field
-  int _totalEmployees = 0;
+  String _selectedPeriod = "Weekly";
 
   // --- INITIALIZATION ---
   @override
@@ -40,7 +41,6 @@ class _ManagerHomePageState extends State<ManagerHome> {
 
   void _initializeData() async {
     await _loadManagerData();
-    await _loadEmployeeCount();
     setState(() {
       _isLoading = false;
     });
@@ -60,8 +60,16 @@ class _ManagerHomePageState extends State<ManagerHome> {
           .collection('users')
           .doc(user.uid)
           .get();
+
+      deptCode = userDoc['deptCode'];
+
+      DocumentSnapshot deptDoc = await FirebaseFirestore.instance
+          .collection('departments')
+          .doc(deptCode)
+          .get();
           
       setState(() {
+        deptName = deptDoc['deptName'];
         deptCode = userDoc['deptCode'];
         lName = userDoc['userLName'];
       });
@@ -105,10 +113,6 @@ class _ManagerHomePageState extends State<ManagerHome> {
           setState(() {
             _selectedIndex = index; // This triggers the UI refresh
           });
-          // If the manager clicks "Home", refresh the count
-          if (index == 0) {
-            _loadEmployeeCount();
-          }
         },
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home_filled), label: "Home"),
@@ -128,13 +132,13 @@ class _ManagerHomePageState extends State<ManagerHome> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // --- Top Greeting Row ---
+            // 1. Top Greeting Row
             Row(
               children: [
                 Expanded(
                   flex: 9,
                   child: Text(
-                    "Hi, Manager $lName", 
+                    "$deptName: Manager", 
                     textAlign: TextAlign.center,
                     style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
                 ),
@@ -149,15 +153,9 @@ class _ManagerHomePageState extends State<ManagerHome> {
 
             const SizedBox(height: 10),
 
+            // 2. Dept Code Card
             _buildCard(
-              child: _buildReportsTab(deptCode)
-            ),
-
-            const SizedBox(height: 10),
-        
-            // 1. Dept Code Card
-            _buildCard(
-              color: Colors.blue.shade50,
+              color: Colors.white,
               child: Row(
                 children: [
                   const Expanded(
@@ -180,39 +178,25 @@ class _ManagerHomePageState extends State<ManagerHome> {
               ),
             ),
 
-            // 4. Activities Card (Scrollable Version)
-            // TODO: link employee's activity within the activity card
+            const SizedBox(height: 10),
+
+            // 3. Today's Attendance
+            const Text("Today's Overview", 
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black)),            
+            const SizedBox(height: 10),
             _buildCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Center(
-                    child: Text(
-                      "Activities", 
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  
-                  // Fixed height container to enable internal scrolling
-                  SizedBox(
-                    height: 150, // Set the height you want for the scrollable area
-                    child: Scrollbar(
-                      controller: _activityScrollController,
-                      thumbVisibility: true, // Makes the scrollbar visible like in your design
-                      child: ListView.builder(
-                        controller: _activityScrollController,
-                        padding: const EdgeInsets.only(right: 10), // Space for the scrollbar
-                        itemCount: 10, // Replace with your actual list length later
-                        itemBuilder: (context, index) {
-                          return _buildActivityItem("Activity ${index + 1}");
-                        },
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              child: _buildTodayOverview(deptCode)
             ),
+
+            const SizedBox(height: 10),
+
+            // 4. Report Tab
+            const Text("Company's Overview", 
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black)),            
+            const SizedBox(height: 10),
+            _buildCard(child: _buildReportsTab()),
+
+            const SizedBox(height: 10),
           ],
         ),
       ),
@@ -242,35 +226,6 @@ class _ManagerHomePageState extends State<ManagerHome> {
     );
   }
 
-  // Helper for Activity Items
-  Widget _buildActivityItem(String title) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade300),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
-    );
-  }
-
-  Future<void> _loadEmployeeCount() async {
-    if (deptCode == "Loading...") return; // Wait until we have the deptCode
-
-    QuerySnapshot querySnapshot = await FirebaseFirestore.instance
-        .collection('users')
-        .where('deptCode', isEqualTo: deptCode)
-        .where('role', isEqualTo: 'Employee')
-        .get();
-
-    if (mounted) {
-      setState(() {
-        _totalEmployees = querySnapshot.docs.length;
-      });
-    }
-  }
-
   Widget _buildStatChip(String label, String value, Color color) {
     return Expanded(
       child: Container(
@@ -290,7 +245,7 @@ class _ManagerHomePageState extends State<ManagerHome> {
     );
   }
 
-  Widget _buildReportsTab(String deptCode) {
+  Widget _buildTodayOverview(String deptCode) {
     // 1. Define 'Today' at Midnight for the query
     DateTime now = DateTime.now();
     Timestamp todayStart = Timestamp.fromDate(DateTime(now.year, now.month, now.day));
@@ -308,46 +263,25 @@ class _ManagerHomePageState extends State<ManagerHome> {
         int totalPresent = snapshot.data!.docs.length;
         int lateCount = snapshot.data!.docs.where((d) => d['attendanceStatus'] == "Late").length;
         int onTimeCount = snapshot.data!.docs.where((d) => d['attendanceStatus'] == "On-Time").length;
+        int otherCount = snapshot.data!.docs.where((d) => d['attendanceStatus'] == "Unscheduled").length;
 
         return SingleChildScrollView(
           padding: const EdgeInsets.all(7),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const Text("Today's Overview", 
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1A3E88))),
-              const SizedBox(height: 20),
-              
               // 3. The Summary Row
               Row(
+                spacing: 7,
                 children: [
                   _buildStatChip("Present", totalPresent.toString(), Colors.blue),
-                  const SizedBox(width: 7),
                   _buildStatChip("On-Time", onTimeCount.toString(), Colors.green),
-                  const SizedBox(width: 7),
-                  _buildStatChip("Late", lateCount.toString(), Colors.orange),
+                  _buildStatChip("Late", lateCount.toString(), Colors.red),
+                  _buildStatChip("Other", otherCount.toString(), Colors.orange),
                 ],
               ),
               
               const SizedBox(height: 30),
-              
-              // 4. Visual Progress Section (Great for FYP marks!)
-              const Text("Punctuality Rate", style: TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 10),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: LinearProgressIndicator(
-                  value: totalPresent == 0 ? 0 : onTimeCount / totalPresent,
-                  minHeight: 12,
-                  backgroundColor: Colors.grey[200],
-                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.green),
-                ),
-              ),
-              const SizedBox(height: 5),
-              Text("${totalPresent == 0 ? 0 : ((onTimeCount / totalPresent) * 100).toInt()}% of arrived staff are on time",
-                style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-              
-              const SizedBox(height: 40),
               
               // 5. Quick Actions or Notifications
               if (lateCount > 0)
@@ -374,6 +308,232 @@ class _ManagerHomePageState extends State<ManagerHome> {
         );
       },
     );
+  }
+
+  // --- Start Reporting ---
+
+  Widget _buildPeriodToggle() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
+      child: SizedBox(
+        width: double.infinity, // 1. Force the container to full width
+        child: SegmentedButton<String>(
+          // 2. Hide the check icon to keep label centering consistent
+          showSelectedIcon: false, 
+          segments: const [
+            ButtonSegment(
+              value: "Weekly", 
+              label: Center(child: Text("Week")), // 3. Wrap label in Center
+            ),
+            ButtonSegment(
+              value: "Monthly", 
+              label: Center(child: Text("Month")),
+            ),
+            ButtonSegment(
+              value: "Yearly", 
+              label: Center(child: Text("Year")),
+            ),
+          ],
+          selected: {_selectedPeriod},
+          onSelectionChanged: (Set<String> newSelection) {
+            setState(() {
+              _selectedPeriod = newSelection.first;
+            });
+          },
+          style: SegmentedButton.styleFrom(
+            selectedBackgroundColor: primaryBlue,
+            selectedForegroundColor: bgLightBlue,
+            // 4. Ensure visual density is tight
+            visualDensity: VisualDensity.comfortable,
+            side: const BorderSide(width: 1, color: Colors.grey),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        ),
+      ),
+    );
+  }
+
+  DateTime _getStartTime(String period) {
+    DateTime now = DateTime.now();
+    switch (period) {
+      case "Weekly":
+        // Gets the start of the current week (Monday)
+        DateTime startOfWeek = now.subtract(Duration(days: now.weekday - 1))
+            .copyWith(hour: 0, minute: 0, second: 0, millisecond: 0, microsecond: 0);
+
+        // 2. Find the end (Sunday at 23:59:59) or just the start of NEXT Monday
+        DateTime endOfWeek = startOfWeek.add(const Duration(days: 7));
+
+        // When querying Firestore, use a range:
+        // .where('shiftDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfWeek))
+        // .where('shiftDate', isLessThan: Timestamp.fromDate(endOfWeek))
+        
+        return startOfWeek;
+      case "Monthly":
+        // Gets the 1st day of the current month
+        return DateTime(now.year, now.month, 1);
+      case "Yearly":
+        // Gets Jan 1st of the current year
+        return DateTime(now.year, 1, 1);
+      default:
+        return now;
+    }
+  }
+
+    Widget _buildReportsTab() {
+    DateTime startDate = _getStartTime(_selectedPeriod);
+    
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          _buildPeriodToggle(), // Moved to the TOP, outside the Stream
+
+          const SizedBox(height: 20),
+          
+          StreamBuilder<QuerySnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('attendances')
+                .where('deptCode', isEqualTo: deptCode)
+                .where('attendanceDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+                .snapshots(),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+
+              if (snapshot.hasError) print(snapshot.error);
+              
+              final docs = snapshot.data!.docs;
+              if (docs.isEmpty) return const Center(child: Text("No records found."));
+              
+              // 1. Logic: Extract counts into a Map for cleaner access
+              final stats = _calculateStats(docs);
+              
+              // 2. UI: Return a scrollable view of pre-made components
+              return Column(
+                children: [
+                  // --- Section 1: Status ---
+                  Row(
+                    spacing: 7,
+                    children: [
+                      // Access the values using the keys defined in the Map
+                      _buildStatChip("Total", "${stats['total']}", Colors.blue),
+                      _buildStatChip("On-Time", "${stats['onTime']}", Colors.green),
+                      _buildStatChip("Late", "${stats['late']}", Colors.red),
+                      _buildStatChip("Other", "${stats['unscheduled']}", Colors.orange),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+              
+                  // --- Section 2: Chart ---
+                  _buildSimpleBarChart(stats['onTime']!, stats['late']!),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildSimpleBarChart(int onTime, int late) {
+    int total = onTime + late;
+    // Prevent division by zero
+    double onTimeWidth = total == 0 ? 0.5 : (onTime / total);
+    double lateWidth = total == 0 ? 0.5 : (late / total);
+
+    return Column(
+      children: [
+        const Text("Punctuality Distribution", 
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+        Container(
+          margin: const EdgeInsets.all(10),
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.grey[50],
+            border: Border.all(color: primaryBlue, width: 2),
+            borderRadius: BorderRadius.circular(15),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Legend
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _buildLegendItem("On-Time", Colors.green, "${(onTimeWidth * 100).toInt()}%"),
+                  _buildLegendItem("Late", Colors.orange, "${(lateWidth * 100).toInt()}%"),
+                ],
+              ),
+              
+              const SizedBox(height: 10),
+              
+              // The actual Bar
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: Row(
+                  children: [
+                    // On-Time Segment
+                    Expanded(
+                      flex: (onTimeWidth * 100).toInt().clamp(1, 100),
+                      child: Container(height: 30, color: Colors.green),
+                    ),
+                    // Late Segment
+                    Expanded(
+                      flex: (lateWidth * 100).toInt().clamp(1, 100),
+                      child: Container(height: 30, color: Colors.orange),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+  
+  Widget _buildLegendItem(String label, Color color, String percentage) {
+    return Row(
+      children: [
+        Container(width: 12, height: 12, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        const SizedBox(width: 8),
+        Text("$label ($percentage)", style: const TextStyle(fontSize: 14, color: Colors.black87)),
+      ],
+    );
+  }
+
+  Map<String, int> _calculateStats(List<QueryDocumentSnapshot> docs) {
+    int onTime = 0;
+    int late = 0;
+    int unscheduled = 0;
+
+    for (var doc in docs) {
+      // 1. Safely extract the data
+      final data = doc.data() as Map<String, dynamic>;
+      
+      // 2. Get the status string (default to Unscheduled if null)
+      final String status = data['attendanceStatus']?.toString() ?? 'Unscheduled';
+
+      // 3. Increment the correct counter in one single loop
+      switch (status) {
+        case 'On-Time':
+          onTime++;
+          break;
+        case 'Late':
+          late++;
+          break;
+        default:
+          unscheduled++;
+          break;
+      }
+    }
+
+    // 4. Return everything in a tidy Map
+    return {
+      'onTime': onTime,
+      'late': late,
+      'unscheduled': unscheduled,
+      'total': docs.length,
+    };
   }
 
   void _showLogoutConfirmation() {

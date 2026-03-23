@@ -78,7 +78,7 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
 
       if (userDoc.exists) {
         var data = userDoc.data() as Map<String, dynamic>;
-        var settings = data['settings'] ?? {}; // Handle missing settings map
+        var settings = data['settings'] ?? {};
 
         // Stops the code if user left the screen
         if (!mounted) return;

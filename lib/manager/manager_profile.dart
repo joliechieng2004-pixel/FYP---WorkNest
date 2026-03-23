@@ -52,8 +52,8 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
   // New settings state
   bool requireGPS = true;
   bool requireFace = true;
-  int gracePeriod = 15;
-  int radiusMeter = 0;
+  int? gracePeriod;
+  int? radiusMeter;
   GeoPoint? officeLocation;
   bool _isLoadingSettings = true;
 
@@ -105,11 +105,14 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
 
       if (doc.exists) {
         Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+        var settings = data['attendanceSettings'] ?? {}; // Handle missing settings map
+
         setState(() {
-          requireGPS = data['attendanceSettings.requireGPS'] ?? true;
-          requireFace = data['attendanceSettings.requireFace'] ?? true;
-          gracePeriod = data['attendanceSettings.gracePeriod'] ?? 15;
-          officeLocation = data['attendanceSettings.officeLocation'];
+          requireGPS = settings['requireGPS'] ?? true;
+          requireFace = settings['requireFace'] ?? true;
+          gracePeriod = settings['gracePeriod'] ?? 15;
+          radiusMeter = settings['radiusMeter'] ?? 50;
+          officeLocation = settings['officeLocation'];
           _isLoadingSettings = false;
         });
       } else {

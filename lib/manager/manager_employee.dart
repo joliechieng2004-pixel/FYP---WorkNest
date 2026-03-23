@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:worknest/services/attendance_count.dart';
 import 'package:worknest/services/auth_service.dart';
 
 class ManagerEmployee extends StatefulWidget {
@@ -12,8 +13,11 @@ class ManagerEmployee extends StatefulWidget {
 }
 
 class _ManagerEmployeePageState extends State<ManagerEmployee> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = "";
+
   // Track which worker is currently expanded
-  int? _expandedIndex;
+  String? _expandedIndex;
   
   late Stream<QuerySnapshot> _userStream;
 
@@ -26,6 +30,12 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
             .where('deptCode', isEqualTo: widget.deptCode)
             .where('userRole', isEqualTo: 'employee') // Only show employees
             .snapshots();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose(); // Always clean up controllers!
+    super.dispose();
   }
 
   @override
@@ -86,11 +96,30 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
                             return const Center(child: Text("No employees found in this department."));
                           }
 
+                          // --- FILTERING LOGIC ---
+                          final allDocs = snapshot.data!.docs;
+                          
+                          final filteredDocs = allDocs.where((doc) {
+                            final data = doc.data() as Map<String, dynamic>;
+                            String fName = (data['userFName'] ?? '').toString().toLowerCase();
+                            String lName = (data['userLName'] ?? '').toString().toLowerCase();
+                            String fullName = "$fName $lName";
+                            
+                            return fullName.contains(_searchQuery);
+                          }).toList();
+
+                          if (filteredDocs.isEmpty) {
+                            return const Center(
+                              child: Text("No employees found matching your search."),
+                            );
+                          }
+
                           return ListView.builder(
+                            key: ValueKey(_searchQuery),
                             padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-                            itemCount: snapshot.data!.docs.length,
+                            itemCount: filteredDocs.length,
                             itemBuilder: (context, index) {
-                              return _buildExpandableWorkerRow(snapshot.data!.docs[index], index);
+                              return _buildExpandableWorkerRow(filteredDocs[index], index);
                             },
                           );
                         },
@@ -123,7 +152,7 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
 
   // Each individual Worker Row that expands
   Widget _buildExpandableWorkerRow(DocumentSnapshot doc, int index) {
-    bool isExpanded = _expandedIndex == index;
+    bool isExpanded = _expandedIndex == doc.id;
     // Extract data from Firestore document
     Map<String, dynamic> worker = doc.data() as Map<String, dynamic>;
     String fName = worker['userFName' ] ?? 'Unknown';
@@ -135,7 +164,7 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
     return GestureDetector(
       onTap: () {
         setState(() {
-          _expandedIndex = isExpanded ? null : index;
+          _expandedIndex = isExpanded ? null : doc.id;
         });
       },
       child: AnimatedContainer(
@@ -155,7 +184,7 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
               children: [
                 Expanded(flex: 1, child: Center(child: Text(workerId, style: const TextStyle(fontWeight: FontWeight.bold)))),
                 Expanded(flex: 3, child: Center(child: Text("$fName $lName"))),
-                const Expanded(flex: 2, child: Center(child: Text("90%"))), // Attendance logic later
+                Expanded(flex: 2, child: Center(child: AttendanceRateWidget(userId: doc.id))),
                 Expanded(
                   flex: 2, 
                   child: Center(
@@ -208,7 +237,41 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        const Text("Search Bar Placeholder"), // Replace with a real TextField later
+        // Search Bar Implementation
+        Expanded(
+          child: Container(
+            height: 45,
+            margin: const EdgeInsets.only(right: 12),
+            child: TextField(
+              controller: _searchController,
+              onChanged: (value) {
+                setState(() {
+                  _searchQuery = value.toLowerCase();
+                });
+              },
+              decoration: InputDecoration(
+                hintText: "Search name...",
+                prefixIcon: const Icon(Icons.search, size: 20, color: Color(0xFF1A3E88)),
+                suffixIcon: _searchQuery.isNotEmpty 
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, size: 20),
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() { _searchQuery = ""; });
+                      },
+                    ) 
+                  : null,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 15),
+                filled: true,
+                fillColor: Colors.grey.shade100,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ),
+        ),
         OutlinedButton.icon(
           onPressed: addWorker,
           icon: const Icon(Icons.add, size: 18),
