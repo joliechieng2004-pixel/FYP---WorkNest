@@ -1,22 +1,59 @@
-// Registration Logic
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'dart:math';
-
 import 'package:intl/intl.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  // TODO: check if the code existed
   // 1. GENERATE RANDOM 8-CHAR DEPT CODE
-  String generateDeptCode() {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    return List.generate(8, (index) => chars[Random().nextInt(chars.length)]).join();
+  Future<String> generateDeptCode() async {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789'; // Changed to lowercase
+    final random = Random();
+    final FirebaseFirestore db = FirebaseFirestore.instance;
+
+    while (true) {
+      // 1. Generate an 8-character lowercase code
+      String newCode = List.generate(
+        8, 
+        (index) => chars[random.nextInt(chars.length)]
+      ).join();
+
+      // 2. Check if this code already exists in the 'departments' collection
+      final query = await db
+          .collection('departments')
+          .where('deptCode', isEqualTo: newCode)
+          .limit(1)
+          .get();
+
+      // 3. If no document is found, the code is unique! Return it.
+      if (query.docs.isEmpty) {
+        return newCode;
+      }
+    }
   }
 
+  String? validatePassword(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Password is required';
+    }
+
+    // RegEx explained:
+    // (?=.*[A-Z])       : At least one uppercase letter
+    // (?=.*[a-z])       : At least one lowercase letter
+    // (?=.*\d)          : At least one digit (number)
+    // .{8,}             : At least 8 characters long
+    final passwordRegExp = RegExp(r'^(?=.*[A-Z])(?=.*[a-z])(?=.*\d).{8,}$');
+
+    if (!passwordRegExp.hasMatch(value)) {
+      return 'Must be 8+ chars with at least an Uppercase, a Lowercase, and a Number';
+    }
+    
+    return null; // Password is valid
+  }
+  
   // 2. MANAGER REGISTRATION (With Incremental Staff ID)
   Future<String?> registerManager({
     required String deptName,
@@ -36,7 +73,10 @@ class AuthService {
       
       // If user not existed
       if (result.user != null) {
-        String newCode = generateDeptCode();
+        // --- TRIGGER VERIFICATION EMAIL HERE ---
+        await result.user!.sendEmailVerification();
+
+        String newCode = await generateDeptCode();
 
         // Create Manager Profile
         await _db.collection('users').doc(result.user!.uid).set({
@@ -54,7 +94,6 @@ class AuthService {
           },
         });
 
-        // TODO: code for register office location for attendance later
         // Create Department Document
         await _db.collection('departments').doc(newCode).set({
           'deptName': deptName,

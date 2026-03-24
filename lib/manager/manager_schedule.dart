@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'package:worknest/services/connectivity_service.dart';
 import 'package:worknest/widget/leaveitem.dart';
 
 class ManagerSchedule extends StatefulWidget {
@@ -17,6 +20,10 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
   // often use colors
   final Color primaryBlue = const Color.fromARGB(255, 40, 75, 158);
   final Color bgLightBlue = const Color.fromARGB(255, 240, 250, 255);
+
+  // check connection
+  late StreamSubscription<bool> _connectivitySubscription;
+  bool _isOffline = false;
   
   late Stream<QuerySnapshot> _shiftStream;
   late Stream<QuerySnapshot> _userStream;
@@ -44,10 +51,37 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
   @override
   void initState() {
     super.initState();
+    // Start listening
+    _connectivitySubscription = ConnectivityService().connectionStream.listen((isOnline) {
+      setState(() {
+        _isOffline = !isOnline;
+      });
+      
+      if (_isOffline) {
+        _showOfflineBanner();
+      } else {
+        ScaffoldMessenger.of(context).clearMaterialBanners();
+      }
+    });
     _selectedDay = DateTime.now(); // Default selection to today
     initStreams();
     // Debug Check
     // _debugCheckDatabase();
+  }
+
+  void _showOfflineBanner() {
+    ScaffoldMessenger.of(context).showMaterialBanner(
+      const MaterialBanner(
+        content: Text(
+          'No Internet Connection. Actions are disabled.',
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: Colors.redAccent,
+        actions: [
+          Icon(Icons.wifi_off, color: Colors.white),
+        ],
+      ),
+    );
   }
 
   void initStreams(){
@@ -81,6 +115,7 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
             .snapshots();
   }
 
+  // DEBUG PURPOSE
   void _debugCheckDatabase() async {
     print("--- DATABASE INSPECTION START ---");
     var snapshot = await FirebaseFirestore.instance
@@ -107,6 +142,7 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
 
   @override
   void dispose() {
+    _connectivitySubscription.cancel();
     _leaveScrollController.dispose(); // Clean up the controller
     _mainScrollController.dispose();
     super.dispose(); 
@@ -460,13 +496,13 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
           height: 30,
           width: 100,
           child: ElevatedButton(
-            onPressed: () => _assignShiftAction(workerID, workerName),
+            onPressed: _isOffline ? null : () => _assignShiftAction(workerID, workerName),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white,
+              backgroundColor: _isOffline ? Colors.grey : Colors.white,
               foregroundColor: Colors.black,
               textStyle: const TextStyle(fontSize: 12),
             ),
-            child: const Text("Assign"),
+            child: Text(_isOffline ? "No Internet" : "Assign"),
           ),
         );
       case 'pending':
@@ -474,13 +510,13 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
           height: 30,
           width: 100,
           child: ElevatedButton(
-            onPressed: () => _removeShiftConfirmation(workerID),
+            onPressed: _isOffline ? null : () => _removeShiftConfirmation(workerID),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blueGrey,
+              backgroundColor: _isOffline ? Colors.grey : Colors.blueGrey,
               foregroundColor: Colors.white,
               textStyle: const TextStyle(fontSize: 12),
             ),
-            child: const Text("Pending"),
+            child: Text(_isOffline ? "No Internet" : "Pending"),
           ),
         );
       case 'accepted':
@@ -488,13 +524,13 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
           height: 30,
           width: 100,
           child: ElevatedButton(
-            onPressed: () => _removeShiftConfirmation(workerID),
+            onPressed: _isOffline ? null : () => _removeShiftConfirmation(workerID),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color.fromARGB(255, 16, 117, 54),
+              backgroundColor: _isOffline ? Colors.grey : const Color.fromARGB(255, 16, 117, 54),
               foregroundColor: Colors.white,
               textStyle: const TextStyle(fontSize: 12),
             ),
-            child: const Text("Accepted"),
+            child: Text(_isOffline ? "No Internet" : "Accepted"),
           ),
         );
       case 'rejected':
@@ -502,13 +538,13 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
           height: 30,
           width: 100,
           child: ElevatedButton(
-            onPressed: () => _removeShiftConfirmation(workerID),
+            onPressed: _isOffline ? null : () => _removeShiftConfirmation(workerID),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color.fromARGB(255, 210, 22, 22),
+              backgroundColor: _isOffline ? Colors.grey : const Color.fromARGB(255, 210, 22, 22),
               foregroundColor: Colors.white,
               textStyle: const TextStyle(fontSize: 12),
             ),
-            child: const Text("Rejected"),
+            child: Text(_isOffline ? "No Internet" : "Rejected"),
           ),
         );
       case 'on-leave':
@@ -522,7 +558,7 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
               disabledForegroundColor: Colors.grey[700],
               textStyle: const TextStyle(fontSize: 12),
             ),
-            child: const Text("On-Leave"),
+            child: Text(_isOffline ? "No Internet" : "On-Leave"),
           ),
         );
       default:

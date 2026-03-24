@@ -160,12 +160,7 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
 
               const SizedBox(height: 10),
 
-              // 2. Request Leave Button
-              _buildGlobalLeaveRequestCard(),
-
-              const SizedBox(height: 10),
-
-              // 3. Shift List for Employee
+              // 2. Shift List for Employee
               _buildCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -231,6 +226,13 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
                   ],
                 ),
               ),
+
+              const SizedBox(height: 10),
+
+              // 3. Request Leave Button
+              _buildGlobalLeaveRequestCard(),
+
+              const SizedBox(height: 10),
 
               // 4. Leave Requests (Scrollable Version)
               _buildCard(
@@ -452,7 +454,7 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
                 SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    "Need time off? Select a date to request leave.",
+                    "Need time off? Request a leave.",
                     style: TextStyle(fontSize: 14),
                   ),
                 ),

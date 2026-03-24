@@ -310,7 +310,7 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
                                     padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
                                   ),
-                                  child: Text(_isOffline ? "Waiting for Connection" : "Update")),
+                                  child: Text(_isOffline ? "No Internet" : "Update")),
                               ),
                             ],
                           )
@@ -380,7 +380,7 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
                                     padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
                                   ),
-                                  child: Text(_isOffline ? "Waiting for Connection" : "Update")),
+                                  child: Text(_isOffline ? "No Internet" : "Update")),
                               ),
                             ],
                           )
@@ -446,7 +446,7 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
                                     padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
                                   ),
-                                  child: Text(_isOffline ? "Waiting for Connection" : "Save")
+                                  child: Text(_isOffline ? "No Internet" : "Save")
                                 ),
                               )
                             ]

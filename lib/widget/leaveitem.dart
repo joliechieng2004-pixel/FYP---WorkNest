@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:worknest/services/connectivity_service.dart';
 
 class ExpandableLeaveItem extends StatefulWidget {
   final String docId;
@@ -25,8 +28,50 @@ class ExpandableLeaveItem extends StatefulWidget {
 }
 
 class _ExpandableLeaveItemState extends State<ExpandableLeaveItem> {
+  // check connection
+  late StreamSubscription<bool> _connectivitySubscription;
+  bool _isOffline = false;
+  
   bool _isExpanded = false;
   final TextEditingController _commentController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    // Start listening
+    _connectivitySubscription = ConnectivityService().connectionStream.listen((isOnline) {
+      setState(() {
+        _isOffline = !isOnline;
+      });
+      
+      if (_isOffline) {
+        _showOfflineBanner();
+      } else {
+        ScaffoldMessenger.of(context).clearMaterialBanners();
+      }
+    });
+  }
+
+  void _showOfflineBanner() {
+    ScaffoldMessenger.of(context).showMaterialBanner(
+      const MaterialBanner(
+        content: Text(
+          'No Internet Connection. Actions are disabled.',
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: Colors.redAccent,
+        actions: [
+          Icon(Icons.wifi_off, color: Colors.white),
+        ],
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _connectivitySubscription.cancel();
+    super.dispose();
+  }
   
   // Helper to get color based on status
   Color _getStatusColor() {
@@ -114,17 +159,17 @@ class _ExpandableLeaveItemState extends State<ExpandableLeaveItem> {
                     children: [
                       Expanded(
                         child: ElevatedButton(
-                          onPressed: () => _handleLeave(true),
-                          style: ElevatedButton.styleFrom(backgroundColor: Colors.green, foregroundColor: Colors.white),
-                          child: const Text("Accept"),
+                          onPressed: _isOffline ? null : () => _handleLeave(true),
+                          style: ElevatedButton.styleFrom(backgroundColor: _isOffline ? Colors.grey : Colors.green, foregroundColor: Colors.white),
+                          child: Text(_isOffline ? "No Internet" : "Accept"),
                         ),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: ElevatedButton(
-                          onPressed: () => _handleLeave(false),
-                          style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-                          child: const Text("Reject"),
+                          onPressed: _isOffline ? null : () => _handleLeave(false),
+                          style: ElevatedButton.styleFrom(backgroundColor: _isOffline ? Colors.grey : Colors.red, foregroundColor: Colors.white),
+                          child: Text(_isOffline ? "No Internet" : "Reject"),
                         ),
                       ),
                     ],

@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:worknest/services/auth_service.dart';
+import 'package:worknest/widget/verify_email_page.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -10,6 +11,8 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> {
+  final _formKey = GlobalKey<FormState>();
+  
   final TextEditingController _deptNameController = TextEditingController();
   final TextEditingController _fNameController = TextEditingController();
   final TextEditingController _lNameController = TextEditingController();
@@ -17,6 +20,8 @@ class _RegisterPageState extends State<RegisterPage> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
+
+  bool _obscurePassword = true;
 
   final AuthService _authService = AuthService(); // Initialize Service
 
@@ -77,7 +82,11 @@ class _RegisterPageState extends State<RegisterPage> {
         backgroundColor: const Color.fromARGB(255, 40, 75, 158),
         foregroundColor: Colors.white
       ),
-      onPressed: _handleRegister,
+      onPressed: () {
+        if (_formKey.currentState!.validate()) {
+            _handleRegister();
+          }
+      },
       child: const Text(
         "Register Account",
         style: TextStyle(
@@ -88,123 +97,152 @@ class _RegisterPageState extends State<RegisterPage> {
     );
   }
 
-  Column RegisterForm() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text("Department Name:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-        TextFormField(
-          controller: _deptNameController,
-          decoration: InputDecoration(
-            labelText: 'e.g. IT Department',
-            enabledBorder: OutlineInputBorder(
-              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
-              borderRadius: BorderRadius.circular(20)),
-            focusedBorder: OutlineInputBorder(
-              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
-              borderRadius: BorderRadius.circular(20)
+  Form RegisterForm() {
+    return Form(
+      key: _formKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text("Department Name:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          TextFormField(
+            controller: _deptNameController,
+            decoration: InputDecoration(
+              labelText: 'e.g. IT Department',
+              enabledBorder: OutlineInputBorder(
+                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                borderRadius: BorderRadius.circular(20)),
+              focusedBorder: OutlineInputBorder(
+                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                borderRadius: BorderRadius.circular(20)
+                )
+            ),
+            validator: (value) => _requiredValidator(value, 'Dept Name'),
+          ),
+          const SizedBox(height: 10),
+          const Text("First Name:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          TextFormField(
+            controller: _fNameController,
+            decoration: InputDecoration(
+              labelText: 'e.g. John (Given Name)',
+              enabledBorder: OutlineInputBorder(
+                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                borderRadius: BorderRadius.circular(20)),
+              focusedBorder: OutlineInputBorder(
+                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                borderRadius: BorderRadius.circular(20)
+                )
+            ),
+            validator: (value) => _requiredValidator(value, 'First Name'),
+          ),
+          const SizedBox(height: 10),
+          const Text("Last Name:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          TextFormField(
+            controller: _lNameController,
+            decoration: InputDecoration(
+              labelText: 'e.g. Lim (Family Name)',
+              enabledBorder: OutlineInputBorder(
+                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                borderRadius: BorderRadius.circular(20)),
+              focusedBorder: OutlineInputBorder(
+                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                borderRadius: BorderRadius.circular(20)
+                )
+            ),
+            validator: (value) => _requiredValidator(value, 'Last Name'),
+          ),
+          const SizedBox(height: 10),
+          const Text("Contact Number:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          TextFormField(
+            controller: _contactController,
+            decoration: InputDecoration(
+              labelText: 'e.g. 0123456789',
+              enabledBorder: OutlineInputBorder(
+                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                borderRadius: BorderRadius.circular(20)),
+              focusedBorder: OutlineInputBorder(
+                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                borderRadius: BorderRadius.circular(20)
+                )
+            ),
+            validator: (value) => _requiredValidator(value, 'Contact Number'),
+          ),
+          const SizedBox(height: 10),
+          const Text("Email:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          TextFormField(
+            controller: _emailController,
+            decoration: InputDecoration(
+              labelText: 'e.g. example@mail.com',
+              enabledBorder: OutlineInputBorder(
+                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                borderRadius: BorderRadius.circular(20)),
+              focusedBorder: OutlineInputBorder(
+                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                borderRadius: BorderRadius.circular(20)
+                )
+            ),
+          ),
+          const SizedBox(height: 10),
+          const Text("Password:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          TextFormField(
+            controller: _passwordController,
+            obscureText: _obscurePassword,
+            decoration: InputDecoration(
+              labelText: 'At least 8 characters',
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                ),
+                onPressed: _togglePasswordVisibility,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                borderRadius: BorderRadius.circular(20)),
+              focusedBorder: OutlineInputBorder(
+                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                borderRadius: BorderRadius.circular(20)
+                )
+            ),
+          ),
+          const SizedBox(height: 10),
+          const Text("Confirm Password:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          TextFormField(
+            controller: _confirmPasswordController,
+            obscureText: _obscurePassword,
+            decoration: InputDecoration(
+              labelText: 'Re-enter your password',
+                  suffixIcon: IconButton(
+                icon: Icon(
+                  _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                ),
+                onPressed: _togglePasswordVisibility,
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                borderRadius: BorderRadius.circular(20)),
+              focusedBorder: OutlineInputBorder(
+                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                borderRadius: BorderRadius.circular(20)
               )
+            ),
           ),
-        ),
-        const SizedBox(height: 10),
-        const Text("First Name:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-        TextFormField(
-          controller: _fNameController,
-          decoration: InputDecoration(
-            labelText: 'e.g. John (Given Name)',
-            enabledBorder: OutlineInputBorder(
-              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
-              borderRadius: BorderRadius.circular(20)),
-            focusedBorder: OutlineInputBorder(
-              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
-              borderRadius: BorderRadius.circular(20)
-              )
-          ),
-        ),
-        const SizedBox(height: 10),
-        const Text("Last Name:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-        TextFormField(
-          controller: _lNameController,
-          decoration: InputDecoration(
-            labelText: 'e.g. Lim (Family Name)',
-            enabledBorder: OutlineInputBorder(
-              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
-              borderRadius: BorderRadius.circular(20)),
-            focusedBorder: OutlineInputBorder(
-              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
-              borderRadius: BorderRadius.circular(20)
-              )
-          ),
-        ),
-        const SizedBox(height: 10),
-        const Text("Contact Number:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-        TextFormField(
-          controller: _contactController,
-          decoration: InputDecoration(
-            labelText: 'e.g. 0123456789',
-            enabledBorder: OutlineInputBorder(
-              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
-              borderRadius: BorderRadius.circular(20)),
-            focusedBorder: OutlineInputBorder(
-              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
-              borderRadius: BorderRadius.circular(20)
-              )
-          ),
-        ),
-        const SizedBox(height: 10),
-        const Text("Email:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-        TextFormField(
-          controller: _emailController,
-          decoration: InputDecoration(
-            labelText: 'e.g. example@mail.com',
-            enabledBorder: OutlineInputBorder(
-              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
-              borderRadius: BorderRadius.circular(20)),
-            focusedBorder: OutlineInputBorder(
-              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
-              borderRadius: BorderRadius.circular(20)
-              )
-          ),
-        ),
-        const SizedBox(height: 10),
-        const Text("Password:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-        TextFormField(
-          controller: _passwordController,
-          obscureText: true,
-          decoration: InputDecoration(
-            labelText: 'At least 8 characters',
-            enabledBorder: OutlineInputBorder(
-              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
-              borderRadius: BorderRadius.circular(20)),
-            focusedBorder: OutlineInputBorder(
-              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
-              borderRadius: BorderRadius.circular(20)
-              )
-          ),
-        ),
-        const SizedBox(height: 10),
-        const Text("Confirm Password:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-        TextFormField(
-          controller: _confirmPasswordController,
-          obscureText: true,
-          decoration: InputDecoration(
-            labelText: 'Re-enter your password',
-            enabledBorder: OutlineInputBorder(
-              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
-              borderRadius: BorderRadius.circular(20)),
-            focusedBorder: OutlineInputBorder(
-              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
-              borderRadius: BorderRadius.circular(20)
-            )
-          ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
   void _handleRegister() async {
-    // Basic Validation (Password & Confirm Password)
-    // TODO: validate email
+
+    // 1. Check Password Strength
+    String? passwordError = _authService.validatePassword(_passwordController.text);
+
+    if (passwordError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(passwordError), backgroundColor: Colors.red),
+      );
+      return;
+    }
+
+    // 2. Check Match
     if (_passwordController.text != _confirmPasswordController.text) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Passwords do not match!")),
@@ -233,13 +271,20 @@ class _RegisterPageState extends State<RegisterPage> {
     Navigator.pop(context); // Remove loading circle
 
     if (result == null) {
-      // SUCCESS!
+      // 1. Success Message
       ScaffoldMessenger.of(context).showSnackBar(
-        // TODO: change duration for better experience
-        const SnackBar(content: Text("Account Created Successfully!"), backgroundColor: Colors.green,),
+        const SnackBar(
+          content: Text("Account Created! Please verify your email."), 
+          backgroundColor: Colors.green,
+        ),
       );
-      // Navigate to Login or Dashboard
-      Navigator.pushReplacementNamed(context, '/manager_home');
+
+      // 2. Go to Verification Screen ONLY
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const VerifyEmailPage()),
+        (route) => false, 
+      );
     } else {
       // ERROR (e.g., email already in use)
       ScaffoldMessenger.of(context).showSnackBar(
@@ -250,5 +295,18 @@ class _RegisterPageState extends State<RegisterPage> {
 
   void goLogin() {
     Navigator.pushReplacementNamed(context, '/login');
+  }
+
+  void _togglePasswordVisibility() {
+    setState(() {
+      _obscurePassword = !_obscurePassword;
+    });
+  }
+
+  String? _requiredValidator(String? value, String fieldName) {
+    if (value == null || value.trim().isEmpty) {
+      return '$fieldName cannot be empty';
+    }
+    return null;
   }
 }

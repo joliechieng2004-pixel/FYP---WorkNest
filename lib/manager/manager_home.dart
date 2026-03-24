@@ -181,9 +181,8 @@ class _ManagerHomePageState extends State<ManagerHome> {
             const SizedBox(height: 10),
 
             // 3. Today's Attendance
-            const Text("Today's Overview", 
+            const Text("Today's Attendance Overview", 
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black)),            
-            const SizedBox(height: 10),
             _buildCard(
               child: _buildTodayOverview(deptCode)
             ),
@@ -191,9 +190,8 @@ class _ManagerHomePageState extends State<ManagerHome> {
             const SizedBox(height: 10),
 
             // 4. Report Tab
-            const Text("Company's Overview", 
+            const Text("Company's Attendance Overview", 
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black)),            
-            const SizedBox(height: 10),
             _buildCard(child: _buildReportsTab()),
 
             const SizedBox(height: 10),
@@ -263,7 +261,6 @@ class _ManagerHomePageState extends State<ManagerHome> {
         int totalPresent = snapshot.data!.docs.length;
         int lateCount = snapshot.data!.docs.where((d) => d['attendanceStatus'] == "Late").length;
         int onTimeCount = snapshot.data!.docs.where((d) => d['attendanceStatus'] == "On-Time").length;
-        int otherCount = snapshot.data!.docs.where((d) => d['attendanceStatus'] == "Unscheduled").length;
 
         return SingleChildScrollView(
           padding: const EdgeInsets.all(7),
@@ -277,7 +274,6 @@ class _ManagerHomePageState extends State<ManagerHome> {
                   _buildStatChip("Present", totalPresent.toString(), Colors.blue),
                   _buildStatChip("On-Time", onTimeCount.toString(), Colors.green),
                   _buildStatChip("Late", lateCount.toString(), Colors.red),
-                  _buildStatChip("Other", otherCount.toString(), Colors.orange),
                 ],
               ),
               
@@ -360,14 +356,6 @@ class _ManagerHomePageState extends State<ManagerHome> {
         // Gets the start of the current week (Monday)
         DateTime startOfWeek = now.subtract(Duration(days: now.weekday - 1))
             .copyWith(hour: 0, minute: 0, second: 0, millisecond: 0, microsecond: 0);
-
-        // 2. Find the end (Sunday at 23:59:59) or just the start of NEXT Monday
-        DateTime endOfWeek = startOfWeek.add(const Duration(days: 7));
-
-        // When querying Firestore, use a range:
-        // .where('shiftDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfWeek))
-        // .where('shiftDate', isLessThan: Timestamp.fromDate(endOfWeek))
-        
         return startOfWeek;
       case "Monthly":
         // Gets the 1st day of the current month
@@ -418,7 +406,6 @@ class _ManagerHomePageState extends State<ManagerHome> {
                       _buildStatChip("Total", "${stats['total']}", Colors.blue),
                       _buildStatChip("On-Time", "${stats['onTime']}", Colors.green),
                       _buildStatChip("Late", "${stats['late']}", Colors.red),
-                      _buildStatChip("Other", "${stats['unscheduled']}", Colors.orange),
                     ],
                   ),
                   const SizedBox(height: 20),

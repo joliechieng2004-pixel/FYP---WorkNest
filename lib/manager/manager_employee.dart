@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:worknest/services/attendance_count.dart';
 import 'package:worknest/services/auth_service.dart';
+import 'package:worknest/services/connectivity_service.dart';
 
 class ManagerEmployee extends StatefulWidget {
   final String deptCode;
@@ -14,6 +17,11 @@ class ManagerEmployee extends StatefulWidget {
 
 class _ManagerEmployeePageState extends State<ManagerEmployee> {
   final TextEditingController _searchController = TextEditingController();
+  
+  // check connection
+  late StreamSubscription<bool> _connectivitySubscription;
+  bool _isOffline = false;
+  
   String _searchQuery = "";
 
   // Track which worker is currently expanded
@@ -24,7 +32,18 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
   @override
   void initState() {
     super.initState();
-
+    // Start listening
+    _connectivitySubscription = ConnectivityService().connectionStream.listen((isOnline) {
+      setState(() {
+        _isOffline = !isOnline;
+      });
+      
+      if (_isOffline) {
+        _showOfflineBanner();
+      } else {
+        ScaffoldMessenger.of(context).clearMaterialBanners();
+      }
+    });
     _userStream = FirebaseFirestore.instance
             .collection('users')
             .where('deptCode', isEqualTo: widget.deptCode)
@@ -32,8 +51,24 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
             .snapshots();
   }
 
+  void _showOfflineBanner() {
+    ScaffoldMessenger.of(context).showMaterialBanner(
+      const MaterialBanner(
+        content: Text(
+          'No Internet Connection. Actions are disabled.',
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: Colors.redAccent,
+        actions: [
+          Icon(Icons.wifi_off, color: Colors.white),
+        ],
+      ),
+    );
+  }
+
   @override
   void dispose() {
+    _connectivitySubscription.cancel();
     _searchController.dispose(); // Always clean up controllers!
     super.dispose();
   }
@@ -218,13 +253,14 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
 
   Widget _actionButton(String label, Color color, VoidCallback onPressed, {bool isDelete = false}) {
     return OutlinedButton(
-      onPressed: onPressed,
+      onPressed: _isOffline ? null : () => onPressed,
       style: OutlinedButton.styleFrom(
         side: const BorderSide(color: Colors.black87),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         padding: const EdgeInsets.symmetric(horizontal: 15),
+        backgroundColor: _isOffline ? Colors.grey : Colors.white
       ),
-      child: Text(label, style: const TextStyle(color: Colors.black87, fontSize: 12)),
+      child: Text(_isOffline ? "No Internet" : label, style: const TextStyle(color: Colors.black87, fontSize: 12)),
     );
   }
 
@@ -273,9 +309,9 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
           ),
         ),
         OutlinedButton.icon(
-          onPressed: addWorker,
-          icon: const Icon(Icons.add, size: 18),
-          label: const Text("Add"),
+          onPressed: _isOffline ? null : () => addWorker,
+          icon: _isOffline ? const Icon(Icons.signal_wifi_connected_no_internet_4) : const Icon(Icons.add, size: 18),
+          label: Text(_isOffline ? "No Internet" : "Add"),
         )
       ]
     );

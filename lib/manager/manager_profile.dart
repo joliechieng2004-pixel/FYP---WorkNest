@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:worknest/services/auth_wrapper.dart';
+import 'package:worknest/services/connectivity_service.dart';
 import 'package:worknest/services/location_service.dart';
 import 'package:worknest/widget/location_picker.dart';
 
@@ -27,6 +30,10 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
 
   final TextEditingController _newPasswordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
+
+  // check connection
+  late StreamSubscription<bool> _connectivitySubscription;
+  bool _isOffline = false;
 
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   int notifyShift = 0;
@@ -63,9 +70,36 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
   @override
   void initState() {
     super.initState();
+    // Start listening
+    _connectivitySubscription = ConnectivityService().connectionStream.listen((isOnline) {
+      setState(() {
+        _isOffline = !isOnline;
+      });
+      
+      if (_isOffline) {
+        _showOfflineBanner();
+      } else {
+        ScaffoldMessenger.of(context).clearMaterialBanners();
+      }
+    });
     docID = FirebaseAuth.instance.currentUser?.uid ?? ""; // Get ID first
     _loadDeptSettings();
     _initializeData();
+  }
+
+  void _showOfflineBanner() {
+    ScaffoldMessenger.of(context).showMaterialBanner(
+      const MaterialBanner(
+        content: Text(
+          'No Internet Connection. Actions are disabled.',
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: Colors.redAccent,
+        actions: [
+          Icon(Icons.wifi_off, color: Colors.white),
+        ],
+      ),
+    );
   }
 
   void _initializeData() async {
@@ -87,6 +121,7 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
 
   @override
   void dispose() {
+    _connectivitySubscription.cancel();
     _profileFNameController.dispose();
     _profileLNameController.dispose();
     _profileEmailController.dispose();
@@ -367,14 +402,14 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: ElevatedButton(
-                                  onPressed: () =>_changeProfileConfirmation(), 
+                                  onPressed: _isOffline ? null : () =>_changeProfileConfirmation(), 
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color.fromARGB(255, 40, 75, 158),
+                                    backgroundColor: _isOffline ? Colors.grey : const Color.fromARGB(255, 40, 75, 158),
                                     foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
                                   ),
-                                  child: const Text("Update")),
+                                  child: Text(_isOffline ? "No Internet" : "Update")),
                               ),
                             ],
                           )
@@ -437,14 +472,14 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: ElevatedButton(
-                                  onPressed: () =>_validateAndUpdatePassword(),
+                                  onPressed: _isOffline ? null : () =>_validateAndUpdatePassword(),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color.fromARGB(255, 40, 75, 158),
+                                    backgroundColor: _isOffline ? Colors.grey : const Color.fromARGB(255, 40, 75, 158),
                                     foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
                                   ),
-                                  child: const Text("Update")),
+                                  child: Text(_isOffline ? "No Internet" : "Update")),
                               ),
                             ],
                           )
@@ -503,14 +538,14 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: ElevatedButton(
-                                  onPressed: _saveNotification, 
+                                  onPressed: _isOffline ? null : () => _saveNotification, 
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color.fromARGB(255, 40, 75, 158),
+                                    backgroundColor: _isOffline ? Colors.grey : const Color.fromARGB(255, 40, 75, 158),
                                     foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
                                   ),
-                                  child: const Text("Save")
+                                  child: Text(_isOffline ? "No Internet" : "Save")
                                 ),
                               )
                             ]
@@ -554,17 +589,17 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                                     ),
                                     const SizedBox(height: 10),
                                     ElevatedButton.icon(
-                                      onPressed: () => _pickLocationFromMap(context), 
-                                      icon: const Icon(Icons.map_rounded),
-                                      label: const Text("Select on Map"),
+                                      onPressed: _isOffline ? null : () => _pickLocationFromMap(context), 
+                                      icon: _isOffline ? const Icon(Icons.signal_wifi_connected_no_internet_4) : const Icon(Icons.map_rounded),
+                                      label: Text(_isOffline ? "No Internet" : "Select on Map"),
                                     ),
                                     Row(
                                       mainAxisAlignment: MainAxisAlignment.start,
                                       children: [
                                         ElevatedButton.icon(
-                                          onPressed: () => _testOfficeRange(),
-                                          icon: const Icon(Icons.checklist_rounded),
-                                          label: const Text("Test Geofence"),
+                                          onPressed: _isOffline ? null : () => _testOfficeRange(),
+                                          icon: _isOffline ? const Icon(Icons.signal_wifi_connected_no_internet_4) : const Icon(Icons.checklist_rounded),
+                                          label: Text(_isOffline ? "No Internet" : "Test Geofence"),
                                         ),
                                         const SizedBox(width: 20),
                                         if (currentDistance != null)
@@ -596,14 +631,14 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: ElevatedButton(
-                                  onPressed: _saveLocation, 
+                                  onPressed: _isOffline ? null : () => _saveLocation, 
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color.fromARGB(255, 40, 75, 158),
+                                    backgroundColor: _isOffline ? Colors.grey : const Color.fromARGB(255, 40, 75, 158),
                                     foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
                                   ),
-                                  child: const Text("Save")
+                                  child: Text(_isOffline ? "No Internet" : "Save")
                                 ),
                               )
                             ]
@@ -699,14 +734,14 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: ElevatedButton(
-                                  onPressed: _saveAttendanceSettings, 
+                                  onPressed: _isOffline ? null : () => _saveAttendanceSettings, 
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color.fromARGB(255, 40, 75, 158),
+                                    backgroundColor: _isOffline ? Colors.grey : const Color.fromARGB(255, 40, 75, 158),
                                     foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
                                   ),
-                                  child: const Text("Save")
+                                  child: Text(_isOffline ? "No Internet" : "Save")
                                 ),
                               )
                             ]
