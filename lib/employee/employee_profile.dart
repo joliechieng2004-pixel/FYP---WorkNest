@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:worknest/services/auth_wrapper.dart';
+import 'package:worknest/services/connectivity_service.dart';
 
 class EmployeeProfile extends StatefulWidget {
   final String deptCode;
@@ -26,6 +29,10 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
   final TextEditingController _newPasswordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
 
+  // check connection
+  late StreamSubscription<bool> _connectivitySubscription;
+  bool _isOffline = false;
+
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   int notifyShift = 0;
   bool notifyCheckIn = false;
@@ -48,8 +55,35 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
   @override
   void initState() {
     super.initState();
+    // Start listening
+    _connectivitySubscription = ConnectivityService().connectionStream.listen((isOnline) {
+      setState(() {
+        _isOffline = !isOnline;
+      });
+      
+      if (_isOffline) {
+        _showOfflineBanner();
+      } else {
+        ScaffoldMessenger.of(context).clearMaterialBanners();
+      }
+    });
     docID = FirebaseAuth.instance.currentUser?.uid ?? ""; // Get ID first
     _initializeData();
+  }
+
+  void _showOfflineBanner() {
+    ScaffoldMessenger.of(context).showMaterialBanner(
+      const MaterialBanner(
+        content: Text(
+          'No Internet Connection. Actions are disabled.',
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: Colors.redAccent,
+        actions: [
+          Icon(Icons.wifi_off, color: Colors.white),
+        ],
+      ),
+    );
   }
 
   void _initializeData() async {
@@ -58,6 +92,7 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
 
   @override
   void dispose() {
+    _connectivitySubscription.cancel();
     _profileFNameController.dispose();
     _profileLNameController.dispose();
     _profileEmailController.dispose();
@@ -268,14 +303,14 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: ElevatedButton(
-                                  onPressed: () =>_changeProfileConfirmation(), 
+                                  onPressed: _isOffline ? null : () => _changeProfileConfirmation(), 
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color.fromARGB(255, 40, 75, 158),
+                                    backgroundColor: _isOffline ? Colors.grey : const Color.fromARGB(255, 40, 75, 158),
                                     foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
                                   ),
-                                  child: const Text("Update")),
+                                  child: Text(_isOffline ? "Waiting for Connection" : "Update")),
                               ),
                             ],
                           )
@@ -338,14 +373,14 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: ElevatedButton(
-                                  onPressed: () =>_validateAndUpdatePassword(),
+                                  onPressed: _isOffline ? null : () => _validateAndUpdatePassword(),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color.fromARGB(255, 40, 75, 158),
+                                    backgroundColor: _isOffline ? Colors.grey : const Color.fromARGB(255, 40, 75, 158),
                                     foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
                                   ),
-                                  child: const Text("Update")),
+                                  child: Text(_isOffline ? "Waiting for Connection" : "Update")),
                               ),
                             ],
                           )
@@ -404,14 +439,14 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: ElevatedButton(
-                                  onPressed: _updateNotificationSettings, 
+                                  onPressed: _isOffline ? null : () => _updateNotificationSettings, 
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color.fromARGB(255, 40, 75, 158),
+                                    backgroundColor: _isOffline ? Colors.grey : const Color.fromARGB(255, 40, 75, 158),
                                     foregroundColor: Colors.white,
                                     padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 12),
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20))
                                   ),
-                                  child: const Text("Save")
+                                  child: Text(_isOffline ? "Waiting for Connection" : "Save")
                                 ),
                               )
                             ]

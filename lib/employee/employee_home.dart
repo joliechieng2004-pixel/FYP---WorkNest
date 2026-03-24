@@ -10,6 +10,7 @@ import 'package:worknest/employee/employee_schedule.dart';
 import 'package:worknest/services/auth_service.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:worknest/services/auth_wrapper.dart';
+import 'package:worknest/services/connectivity_service.dart';
 import 'package:worknest/services/location_service.dart';
 import 'package:worknest/widget/face_verification.dart';
 
@@ -28,6 +29,10 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
 
   // navigation data
   int _selectedIndex = 0;
+
+  // check connection
+  late StreamSubscription<bool> _connectivitySubscription;
+  bool _isOffline = false;
 
   // timer
   bool _isClockedIn = false;
@@ -58,7 +63,34 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
   @override
   void initState() {
     super.initState();
+    // Start listening
+    _connectivitySubscription = ConnectivityService().connectionStream.listen((isOnline) {
+      setState(() {
+        _isOffline = !isOnline;
+      });
+      
+      if (_isOffline) {
+        _showOfflineBanner();
+      } else {
+        ScaffoldMessenger.of(context).clearMaterialBanners();
+      }
+    });
     _initializeData();
+  }
+
+  void _showOfflineBanner() {
+    ScaffoldMessenger.of(context).showMaterialBanner(
+      const MaterialBanner(
+        content: Text(
+          'No Internet Connection. Actions are disabled.',
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: Colors.redAccent,
+        actions: [
+          Icon(Icons.wifi_off, color: Colors.white),
+        ],
+      ),
+    );
   }
 
   void _initializeData() async {
@@ -71,6 +103,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
 
   @override
   void dispose() {
+    _connectivitySubscription.cancel();
     _timer?.cancel();
     _mainScrollController.dispose();
     _shiftScrollController.dispose(); // Clean up the controller
@@ -294,13 +327,13 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
                     
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF00C2A0), // Teal Green
+                        backgroundColor: _isOffline ? Colors.grey : const Color(0xFF00C2A0), // Teal Green
                         foregroundColor: Colors.black,
                         minimumSize: const Size(250, 50),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                       ),
-                      onPressed: _clockIn,
-                      child: const Text("Clock In", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      onPressed: _isOffline ? null : () => _clockIn,
+                      child: Text(_isOffline ? "Waiting for Connection" : "Clock In", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                     )
                   ] else ...[
                     Row(

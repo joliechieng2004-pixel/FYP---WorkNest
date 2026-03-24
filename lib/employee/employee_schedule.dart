@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'package:worknest/services/connectivity_service.dart';
 import 'package:worknest/widget/leaveitem.dart';
 
 class EmployeeSchedule extends StatefulWidget {
@@ -22,6 +25,11 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
   final TextEditingController _leaveController = TextEditingController();
   final ScrollController _leaveScrollController = ScrollController();
   final ScrollController _shiftScrollController = ScrollController();
+
+  // check connection
+  late StreamSubscription<bool> _connectivitySubscription;
+  bool _isOffline = false;
+
   String deptCode = "Loading...";
   
   String formattedDate = DateFormat('EEEE, d MMM yyyy').format(DateTime.now());
@@ -33,7 +41,34 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
   @override
   void initState() {
     super.initState();
+    // Start listening
+    _connectivitySubscription = ConnectivityService().connectionStream.listen((isOnline) {
+      setState(() {
+        _isOffline = !isOnline;
+      });
+      
+      if (_isOffline) {
+        _showOfflineBanner();
+      } else {
+        ScaffoldMessenger.of(context).clearMaterialBanners();
+      }
+    });
     _updateStream();
+  }
+
+  void _showOfflineBanner() {
+    ScaffoldMessenger.of(context).showMaterialBanner(
+      const MaterialBanner(
+        content: Text(
+          'No Internet Connection. Actions are disabled.',
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: Colors.redAccent,
+        actions: [
+          Icon(Icons.wifi_off, color: Colors.white),
+        ],
+      ),
+    );
   }
 
   void _updateStream() {
@@ -52,6 +87,7 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
 
   @override
   void dispose() {
+    _connectivitySubscription.cancel();
     _leaveController.dispose();
     _leaveScrollController.dispose();
     _shiftScrollController.dispose();
@@ -424,12 +460,12 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
             ),
             const SizedBox(height: 15),
             ElevatedButton.icon(
-              onPressed: () => _selectDateAndRequestLeave(context),
+              onPressed: _isOffline ? null : () => _selectDateAndRequestLeave(context),
               icon: const Icon(Icons.beach_access, size: 18),
-              label: const Text("Select Date & Request Leave"),
+              label: Text(_isOffline ? "Waiting for Connection" : "Select Date & Request Leave"),
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size(double.infinity, 45),
-                backgroundColor: primaryBlue,
+                backgroundColor: _isOffline ? Colors.grey : primaryBlue,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
@@ -599,53 +635,6 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
     }
   }
 
-  Widget _buildShiftList() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: _allShiftStream,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Padding(
-            padding: EdgeInsets.all(20.0),
-            child: Center(child: CircularProgressIndicator()),
-          );
-        }
-
-        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-          return _buildCard(
-            color: Colors.white,
-            child: const Padding(
-              padding: EdgeInsets.all(20.0),
-              child: Center(
-                child: Text(
-                  "No upcoming shifts assigned.",
-                  style: TextStyle(color: Colors.grey, fontSize: 16),
-                ),
-              ),
-            ),
-          );
-        }
-
-        // Use ListView.builder with shrinkWrap to work inside SingleChildScrollView
-        return ListView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(), // Let the parent scroll
-          itemCount: snapshot.data!.docs.length,
-          itemBuilder: (context, index) {
-            var shiftDoc = snapshot.data!.docs[index];
-            var shiftData = shiftDoc.data() as Map<String, dynamic>;
-            String shiftID = shiftDoc.id;
-            String status = shiftData['shiftStatus'] ?? 'pending';
-
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: _buildEmployeeShiftCard(shiftData, shiftID, status),
-            );
-          },
-        );
-      },
-    );
-  }
-
   // Small helper for the Accept/Reject buttons
   Widget _buildActionButton(String label, Color color, VoidCallback onTap, bool isFilled, {bool isDisabled = false}) {
     return SizedBox(
@@ -686,15 +675,15 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
             child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: _isOffline ? null : () {
               Navigator.pop(context); // Close dialog
               _updateStatus(docID, newStatus); // Perform update
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: newStatus == 'accepted' ? Colors.green : Colors.red,
+              backgroundColor: _isOffline ? Colors.grey : (newStatus == 'accepted' ? Colors.green : Colors.red),
               foregroundColor: Colors.white,
             ),
-            child: const Text("Confirm"),
+            child: Text(_isOffline ? "No Internet" : "Confirm"),
           ),
         ],
       ),

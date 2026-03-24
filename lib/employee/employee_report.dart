@@ -44,7 +44,7 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
     final attendanceStream = FirebaseFirestore.instance
         .collection('attendances')
         .where('attendanceUserId', isEqualTo: widget.workerID)
-        .where('attendanceDate', isGreaterThanOrEqualTo: Timestamp.fromDate(_getStartDate()))
+        .where('attendanceDate', isGreaterThanOrEqualTo: Timestamp.fromDate(_getStartDate(_selectedPeriod)))
         .orderBy('attendanceDate', descending: true)
         .snapshots();
 
@@ -291,11 +291,20 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
     );
   }
 
-  DateTime _getStartDate() {
+  DateTime _getStartDate(String period) {
     DateTime now = DateTime.now();
-    if (_selectedPeriod == 'Weekly') return now.subtract(const Duration(days: 7));
-    if (_selectedPeriod == 'Monthly') return now.subtract(const Duration(days: 30));
-    return DateTime(now.year, 1, 1); // Yearly (Start of current year)
+    switch (period) {
+      case "Weekly":
+        DateTime startOfWeek = now.subtract(Duration(days: now.weekday - 1))
+            .copyWith(hour: 0, minute: 0, second: 0, millisecond: 0, microsecond: 0);
+        return startOfWeek;
+      case "Monthly":
+        return DateTime(now.year, now.month, 1);
+      case "Yearly":
+        return DateTime(now.year, 1, 1);
+      default:
+        return now;
+    }
   }
 
   Widget _buildPeriodToggle() {
