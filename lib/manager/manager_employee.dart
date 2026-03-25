@@ -309,7 +309,7 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
           ),
         ),
         OutlinedButton.icon(
-          onPressed: _isOffline ? null : () => addWorker,
+          onPressed: _isOffline ? null : addWorker,
           icon: _isOffline ? const Icon(Icons.signal_wifi_connected_no_internet_4) : const Icon(Icons.add, size: 18),
           label: Text(_isOffline ? "No Internet" : "Add"),
         )

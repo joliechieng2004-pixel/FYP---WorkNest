@@ -332,7 +332,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
                         minimumSize: const Size(250, 50),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                       ),
-                      onPressed: _isOffline ? null : () => _clockIn,
+                      onPressed: _isOffline ? null : _clockIn,
                       child: Text(_isOffline ? "Waiting for Connection" : "Clock In", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                     )
                   ] else ...[
@@ -468,7 +468,6 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
                             controller: _shiftScrollController,
                             primary: false,
                             physics: const AlwaysScrollableScrollPhysics(),
-                            padding: const EdgeInsets.only(right: 10),
                             itemCount: shifts.length,
                             separatorBuilder: (context, index) => Divider(color: bgLightBlue,),
                             itemBuilder: (context, index) {
@@ -793,7 +792,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
     // Set dynamic text and colors based on the early leave status
     String dialogTitle = isEarlyLeave ? "Early Clock Out Warning" : "Confirm Clock Out";
     String dialogContent = isEarlyLeave 
-        ? "You haven't reached your scheduled shift end time yet. Are you sure you want to clock out early?"
+        ? "Clock out too early may be marked as ABSENT. Are you sure you want to clock out early?"
         : "Are you sure you want to end your shift?";
     Color confirmButtonColor = isEarlyLeave ? Colors.red : Colors.white;
     Color confirmTextColor = isEarlyLeave ? Colors.white : Colors.black;

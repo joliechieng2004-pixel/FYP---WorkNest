@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:worknest/services/pdf_service.dart';
+import 'package:rxdart/rxdart.dart';
 
 class ManagerReportPage extends StatefulWidget {
   final String deptCode;
@@ -16,9 +17,122 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
   final Color primaryBlue = const Color.fromARGB(255, 40, 75, 158);
   final Color bgLightBlue = const Color.fromARGB(255, 240, 250, 255);
   int? _expandedIndex;
-  String _selectedPeriod = "Weekly";
+  String _selectedPeriod = "All";
 
   final Map<String, TextEditingController> _reasonControllers = {};
+
+  // The master stream variable
+  late Stream<ReportData> _masterReportStream;
+
+  @override
+  void initState() {
+    super.initState();
+    _initStreams(); // Initialize the stream immediately
+  }
+
+  // Centralized stream initialization
+  void _initStreams() {
+    DateTime startDate = _getStartTime(_selectedPeriod);
+    DateTime endDate = DateTime.now(); // Upper bound to prevent fetching future absences
+    
+    // a. Load Shifts
+    var schedulesStream = FirebaseFirestore.instance.collection('shifts')
+        .where('deptCode', isEqualTo: widget.deptCode)
+        .where('shiftDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+        .where('shiftDate', isLessThanOrEqualTo: Timestamp.fromDate(endDate))
+        .where('shiftStatus', isEqualTo: 'accepted')
+        .snapshots();
+
+    // b. Load Leaves
+    var leavesStream = FirebaseFirestore.instance.collection('leaves')
+        .where('deptCode', isEqualTo: widget.deptCode)
+        .where('leaveDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+        .where('leaveDate', isLessThanOrEqualTo: Timestamp.fromDate(endDate))
+        .where('leaveStatus', isEqualTo: 'approved')
+        .snapshots();
+
+    // c. Load Attendances
+    var attendancesStream = FirebaseFirestore.instance.collection('attendances')
+        .where('deptCode', isEqualTo: widget.deptCode)
+        .where('attendanceDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+        .orderBy('attendanceDate', descending: true)
+        .snapshots();
+
+    // Combine all three streams into one ReportData object
+    _masterReportStream = Rx.combineLatest3(
+      schedulesStream,
+      leavesStream,
+      attendancesStream,
+      (QuerySnapshot schedules, QuerySnapshot leaves, QuerySnapshot attendances) {
+        
+        List<Map<String, dynamic>> absentList = _calculateAbsences(
+          schedules.docs, leaves.docs, attendances.docs
+        );
+        
+        return ReportData(absentList, attendances.docs);
+      }
+    );
+  }
+
+  // 4. ADDED: The core comparison logic
+  List<Map<String, dynamic>> _calculateAbsences(
+    List<QueryDocumentSnapshot> schedules,
+    List<QueryDocumentSnapshot> leaves,
+    List<QueryDocumentSnapshot> attendances,
+  ) {
+    List<Map<String, dynamic>> absentList = [];
+    DateFormat dateKeyFormat = DateFormat('yyyy-MM-dd');
+
+    for (var shift in schedules) {
+      var shiftData = shift.data() as Map<String, dynamic>;
+      
+      // Assumes identifier is workerName. Change to workerID if that's what your DB uses.
+      String workerName = shiftData['shiftUserName'] ?? ''; 
+      if (shiftData['shiftDate'] == null) continue;
+      
+      DateTime shiftDate = (shiftData['shiftDate'] as Timestamp).toDate();
+      String shiftDateString = dateKeyFormat.format(shiftDate);
+      DateTime? shiftEndTime = shiftData['shiftEndTime'] != null ? (shiftData['shiftEndTime'] as Timestamp).toDate() : null;
+
+      // d. Compare with Leave
+      bool hasLeave = leaves.any((leaveDoc) {
+        var leaveData = leaveDoc.data() as Map<String, dynamic>;
+        if (leaveData['leaveUserName'] != workerName || leaveData['leaveDate'] == null) return false;
+        return dateKeyFormat.format((leaveData['leaveDate'] as Timestamp).toDate()) == shiftDateString;
+      });
+
+      if (hasLeave) continue; // Skip, worker is on leave
+
+      // e. Compare with Attendance
+      bool hasValidAttendance = attendances.any((attDoc) {
+        var attData = attDoc.data() as Map<String, dynamic>;
+        if (attData['attendanceUserName'] != workerName || attData['attendanceDate'] == null) return false;
+        
+        String attDateString = dateKeyFormat.format((attData['attendanceDate'] as Timestamp).toDate());
+        
+        if (attDateString == shiftDateString) {
+          bool isOnTime = attData['attendanceStatus'] == 'On-Time';
+          DateTime? attEndTime = attData['attendanceEndTime'] != null ? (attData['attendanceEndTime'] as Timestamp).toDate() : null;
+          
+          bool endTimeValid = false;
+          if (attEndTime != null && shiftEndTime != null) {
+            // attendanceEndTime later or equal to shiftEndTime
+            endTimeValid = attEndTime.isAfter(shiftEndTime) || attEndTime.isAtSameMomentAs(shiftEndTime);
+          }
+
+          if (isOnTime && endTimeValid) return true;
+        }
+        return false;
+      });
+
+      if (hasValidAttendance) continue; // Skip, worker attended correctly
+
+      // f. If no leave and no valid attendance, it's an absent shift
+      absentList.add(shiftData);
+    }
+
+    return absentList;
+  }
 
   @override
   void dispose() {
@@ -31,120 +145,171 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
 
   @override
   Widget build(BuildContext context) {
-    DateTime startDate = _getStartTime(_selectedPeriod);
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Manage Attendance"),
+        title: const Text("Manage Report"),
         centerTitle: true,
         backgroundColor: primaryBlue,
         foregroundColor: Colors.white,
       ),
       backgroundColor: bgLightBlue,
       body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 1. The Period Toggle
-            _buildPeriodToggle(),
-            
-            const Padding(
-              padding: EdgeInsets.only(left: 20, top: 10),
-              child: Text("Attendance Log:", 
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 1. The Period Toggle
+              _buildPeriodToggle(),
 
-            // 2. The Stream that handles both the List and the Export Button
-            Expanded(
-              child: StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('attendances')
-                    .where('deptCode', isEqualTo: widget.deptCode)
-                    .where('attendanceDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
-                    .orderBy('attendanceDate', descending: true)
-                    .snapshots(),
-                builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    debugPrint("Firestore Error: ${snapshot.error}");
-                    return const Center(child: Text("Something went wrong. Check console for Index URL."));
-                  }
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
+              const SizedBox(height: 10),
+              
+              // 5. The Master StreamBuilder holding both sections
+              SizedBox(
+                height: 800,
+                child: StreamBuilder<ReportData>(
+                  stream: _masterReportStream,
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      debugPrint("Firestore Error: ${snapshot.error}");
+                      return const Center(child: Text("Something went wrong. Check console for Index URL."));
+                    }
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+          
+                    final absentShifts = snapshot.data?.absentShifts ?? [];
+                    final attendanceDocs = snapshot.data?.attendances ?? [];
+          
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // --- ABSENT SHIFTS SECTION ---
+                        const Padding(
+                          padding: EdgeInsets.only(left: 20, top: 5),
+                          child: Text("Absent / Unattended Shifts:", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.red)),
+                        ),
+                        Expanded(
+                          flex: 1, // Takes up half the list space
+                          child: _buildAbsentContainer(absentShifts),
+                        ),
 
-                  final docs = snapshot.data?.docs ?? [];
+                        const SizedBox(height: 10),
+          
+                        // --- ATTENDANCE SECTION ---
+                        const Padding(
+                          padding: EdgeInsets.only(left: 20, top: 10),
+                          child: Text("Attendance Log:", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                        ),
+                        Expanded(
+                          flex: 2, // Takes up half the list space
+                          child: _buildAttendanceContainer(attendanceDocs),
+                        ),
 
-                  return Column(
-                    children: [
-                      // --- The List Container ---
-                      Expanded(
-                        child: Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(15),
-                            border: Border.all(color: const Color(0xFF1A3E88), width: 2),
-                          ),
-                          child: Column(
-                            children: [
-                              _buildCustomHeader(),
-                              const Divider(height: 1, color: Color(0xFF1A3E88)),
-                              
-                              Expanded(
-                                child: docs.isEmpty 
-                                  ? const Center(child: Text("No records found for this period."))
-                                  : ListView.separated(
-                                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-                                      itemCount: docs.length,
-                                      separatorBuilder: (context, index) => const Divider(),
-                                      itemBuilder: (context, index) {
-                                        return _buildExpandableAttendanceRow(docs[index], index);
-                                      },
-                                  ),
+                        const SizedBox(height: 10),
+          
+                        // --- EXPORT BUTTON ---
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+                          child: SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              icon: const Icon(Icons.picture_as_pdf),
+                              label: const Text("Export Attendance Report", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                foregroundColor: primaryBlue,
+                                side: BorderSide(width: 2, color: primaryBlue),
+                                padding: const EdgeInsets.all(15),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))
                               ),
-                            ],
-                          ),
-                        ),
-                      ),
-
-                      // --- 3. The Export Button ---
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-                        child: SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            icon: const Icon(Icons.picture_as_pdf),
-                            label: const Text("Export Attendance Records", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white,
-                              foregroundColor: primaryBlue,
-                              side: BorderSide(width: 2, color: primaryBlue),
-                              padding: const EdgeInsets.all(15),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))
-                            ),
-                            onPressed: () {
-                              if (docs.isEmpty) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text("No data available to export.")),
+                              onPressed: () {
+                                if (attendanceDocs.isEmpty && absentShifts.isEmpty) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(content: Text("No data available to export.")),
+                                  );
+                                  return;
+                                }
+                                // Updated call passing BOTH lists
+                                PdfExportService.exportAttendanceReport(
+                                  title: "Department Attendance Report",
+                                  docs: attendanceDocs,
+                                  absentShifts: absentShifts, // NEW PARAMETER
+                                  period: _selectedPeriod,
                                 );
-                                return;
-                              }
-                              PdfExportService.exportAttendanceReport(
-                                title: "Department Attendance Report",
-                                docs: docs,
-                                period: _selectedPeriod,
-                              );
-                            },
+                              },
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  );
-                },
+                      ],
+                    );
+                  },
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  // ADDED: UI Container for Absent List
+  Widget _buildAbsentContainer(List<Map<String, dynamic>> absentShifts) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: Colors.red.shade900, width: 2), // Red border to stand out
+      ),
+      child: absentShifts.isEmpty 
+        ? const Center(child: Text("No absent shifts for this period.", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)))
+        : ListView.separated(
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+            itemCount: absentShifts.length,
+            separatorBuilder: (context, index) => const Divider(),
+            itemBuilder: (context, index) {
+              var shift = absentShifts[index];
+              DateTime? date = shift['shiftDate'] != null ? (shift['shiftDate'] as Timestamp).toDate() : null;
+              String formattedDate = date != null ? DateFormat('dd MMM yyyy').format(date) : "No Date";
+              
+              return ListTile(
+                leading: const Icon(Icons.warning, color: Colors.red),
+                title: Text(shift['shiftUserName'] ?? 'Unknown Worker', style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text("Expected Shift: $formattedDate"),
+                trailing: const Text("Absent", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+              );
+            },
+          ),
+    );
+  }
+
+  // EXTRACTED: Original Attendance Container UI
+  Widget _buildAttendanceContainer(List<QueryDocumentSnapshot> docs) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: const Color(0xFF1A3E88), width: 2),
+      ),
+      child: Column(
+        children: [
+          _buildCustomHeader(),
+          const Divider(height: 1, color: Color(0xFF1A3E88)),
+          Expanded(
+            child: docs.isEmpty 
+              ? const Center(child: Text("No records found for this period."))
+              : ListView.separated(
+                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                  itemCount: docs.length,
+                  separatorBuilder: (context, index) => const Divider(),
+                  itemBuilder: (context, index) {
+                    return _buildExpandableAttendanceRow(docs[index], index);
+                  },
+              ),
+          ),
+        ],
       ),
     );
   }
@@ -156,7 +321,7 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
       child: const Row(
         children: [
           Expanded(flex: 3, child: Center(child: Text("Date", style: TextStyle(fontWeight: FontWeight.bold)))),
-          Expanded(flex: 3, child: Center(child: Text("Worker", style: TextStyle(fontWeight: FontWeight.bold)))),
+          Expanded(flex: 3, child: Center(child: Text("Employee", style: TextStyle(fontWeight: FontWeight.bold)))),
           Expanded(flex: 2, child: Center(child: Text("Status", style: TextStyle(fontWeight: FontWeight.bold)))),
           Expanded(flex: 1, child: Center(child: Text(" ", style: TextStyle(fontWeight: FontWeight.bold)))),
         ],
@@ -426,6 +591,7 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
           onSelectionChanged: (Set<String> newSelection) {
             setState(() {
               _selectedPeriod = newSelection.first;
+              _initStreams();
             });
           },
           style: SegmentedButton.styleFrom(
@@ -439,4 +605,10 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
       ),
     );
   }
+}
+
+class ReportData {
+  final List<Map<String, dynamic>> absentShifts;
+  final List<QueryDocumentSnapshot> attendances;
+  ReportData(this.absentShifts, this.attendances);
 }

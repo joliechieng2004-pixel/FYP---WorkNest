@@ -402,7 +402,7 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: ElevatedButton(
-                                  onPressed: _isOffline ? null : () =>_changeProfileConfirmation(), 
+                                  onPressed: _isOffline ? null : _changeProfileConfirmation, 
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: _isOffline ? Colors.grey : const Color.fromARGB(255, 40, 75, 158),
                                     foregroundColor: Colors.white,
@@ -472,7 +472,7 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: ElevatedButton(
-                                  onPressed: _isOffline ? null : () =>_validateAndUpdatePassword(),
+                                  onPressed: _isOffline ? null : _validateAndUpdatePassword,
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: _isOffline ? Colors.grey : const Color.fromARGB(255, 40, 75, 158),
                                     foregroundColor: Colors.white,
@@ -538,7 +538,7 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: ElevatedButton(
-                                  onPressed: _isOffline ? null : () => _saveNotification, 
+                                  onPressed: _isOffline ? null : _saveNotification, 
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: _isOffline ? Colors.grey : const Color.fromARGB(255, 40, 75, 158),
                                     foregroundColor: Colors.white,
@@ -597,7 +597,7 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                                       mainAxisAlignment: MainAxisAlignment.start,
                                       children: [
                                         ElevatedButton.icon(
-                                          onPressed: _isOffline ? null : () => _testOfficeRange(),
+                                          onPressed: _isOffline ? null : _testOfficeRange,
                                           icon: _isOffline ? const Icon(Icons.signal_wifi_connected_no_internet_4) : const Icon(Icons.checklist_rounded),
                                           label: Text(_isOffline ? "No Internet" : "Test Geofence"),
                                         ),
@@ -631,7 +631,7 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: ElevatedButton(
-                                  onPressed: _isOffline ? null : () => _saveLocation, 
+                                  onPressed: _isOffline ? null : _saveLocation, 
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: _isOffline ? Colors.grey : const Color.fromARGB(255, 40, 75, 158),
                                     foregroundColor: Colors.white,
@@ -734,7 +734,7 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: ElevatedButton(
-                                  onPressed: _isOffline ? null : () => _saveAttendanceSettings, 
+                                  onPressed: _isOffline ? null : _saveAttendanceSettings, 
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: _isOffline ? Colors.grey : const Color.fromARGB(255, 40, 75, 158),
                                     foregroundColor: Colors.white,

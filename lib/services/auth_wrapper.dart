@@ -22,7 +22,7 @@ class AuthWrapper extends StatelessWidget {
         }
 
         // 2. If snapshot has data, a user is already logged in!
-        if (snapshot.hasData) {
+        if (snapshot.hasData && snapshot.data != null) {
           // STEP 2: We have a user, now check their role in Firestore
           return FutureBuilder<DocumentSnapshot>(
             future: FirebaseFirestore.instance
@@ -39,9 +39,9 @@ class AuthWrapper extends StatelessWidget {
                 String role = userData['userRole'] ?? 'employee'; // Default to employee
 
                 if (role == 'manager') {
-                  return const ManagerHome(key: ValueKey('ManagerView'),); 
+                  return const ManagerHome(); 
                 } else {
-                  return const EmployeeHome(key: ValueKey('EmployeeView'),);
+                  return const EmployeeHome();
                 }
               }
 

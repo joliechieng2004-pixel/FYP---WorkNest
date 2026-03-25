@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:worknest/services/attendance_count.dart';
 import 'package:worknest/services/pdf_service.dart';
+import 'package:rxdart/rxdart.dart';
 
 class EmployeeReport extends StatefulWidget {
   final String deptCode;
@@ -16,38 +17,122 @@ class EmployeeReport extends StatefulWidget {
 }
 
 class _EmployeeReportPageState extends State<EmployeeReport> {
-  // often use colors
   final Color primaryBlue = const Color.fromARGB(255, 40, 75, 158);
   final Color bgLightBlue = const Color.fromARGB(255, 240, 250, 255);
   
   final ScrollController _timesheetScrollController = ScrollController();
+  final ScrollController _absentScrollController = ScrollController(); // Added for the new vertical list
 
   String _selectedPeriod = "Weekly";
+  
+  Stream<ReportData>? _masterReportStream;
   List<QueryDocumentSnapshot> _currentDocs = [];
+  List<Map<String, dynamic>> _currentAbsences = [];
 
   // --- INITIALIZATION ---
   @override
   void initState() {
     super.initState();
     debugPrint(widget.workerID);
-    }
+    _initStreams(); 
+  }
 
   @override
   void dispose() {
-    _timesheetScrollController.dispose(); // Clean up the controller
+    _timesheetScrollController.dispose();
+    _absentScrollController.dispose();
     super.dispose(); 
+  }
+
+  // Helper for safe date conversion
+  DateTime? _safeDate(dynamic value) {
+    if (value == null) return null;
+    if (value is Timestamp) return value.toDate();
+    if (value is String) return DateTime.tryParse(value);
+    return null;
+  }
+
+  // --- STREAM LOGIC ---
+  void _initStreams() {
+    DateTime startDate = _getStartDate(_selectedPeriod);
+    DateTime endDate = DateTime.now(); 
+
+    var schedulesStream = FirebaseFirestore.instance.collection('shifts')
+        .where('shiftUserID', isEqualTo: widget.workerID) 
+        .where('shiftDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+        .where('shiftDate', isLessThanOrEqualTo: Timestamp.fromDate(endDate))
+        .where('shiftStatus', isEqualTo: 'accepted')
+        .snapshots();
+
+    var leavesStream = FirebaseFirestore.instance.collection('leaves')
+        .where('leaveUserID', isEqualTo: widget.workerID) 
+        .where('leaveDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+        .where('leaveDate', isLessThanOrEqualTo: Timestamp.fromDate(endDate))
+        .where('leaveStatus', isEqualTo: 'approved')
+        .snapshots();
+
+    var attendancesStream = FirebaseFirestore.instance.collection('attendances')
+        .where('attendanceUserID', isEqualTo: widget.workerID)
+        .where('attendanceDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
+        .where('attendanceDate', isLessThanOrEqualTo: Timestamp.fromDate(endDate))
+        .orderBy('attendanceDate', descending: true)
+        .snapshots();
+
+    _masterReportStream = Rx.combineLatest3(
+      schedulesStream,
+      leavesStream,
+      attendancesStream,
+      (QuerySnapshot schedules, QuerySnapshot leaves, QuerySnapshot attendances) {
+        List<Map<String, dynamic>> absentList = _calculateAbsences(
+          schedules.docs, leaves.docs, attendances.docs
+        );
+        return ReportData(absentList, attendances.docs);
+      }
+    );
+  }
+
+  List<Map<String, dynamic>> _calculateAbsences(
+    List<QueryDocumentSnapshot> schedules,
+    List<QueryDocumentSnapshot> leaves,
+    List<QueryDocumentSnapshot> attendances,
+  ) {
+    List<Map<String, dynamic>> absences = [];
+    
+    for (var shift in schedules) {
+      var shiftData = shift.data() as Map<String, dynamic>;
+      if (shiftData['shiftDate'] == null) continue;
+
+      DateTime shiftDate = (shiftData['shiftDate'] as Timestamp).toDate();
+      
+      if (shiftDate.isAfter(DateTime.now())) continue;
+
+      bool hasAttendance = attendances.any((att) {
+        var attData = att.data() as Map<String, dynamic>;
+        DateTime? attDate = _safeDate(attData['attendanceDate']);
+        if (attDate == null) return false;
+        return DateFormat('yyyyMMdd').format(shiftDate) == DateFormat('yyyyMMdd').format(attDate);
+      });
+
+      if (hasAttendance) continue;
+
+      bool hasLeave = leaves.any((leave) {
+        var leaveData = leave.data() as Map<String, dynamic>;
+        DateTime? leaveDate = _safeDate(leaveData['leaveDate']);
+        if (leaveDate == null) return false;
+        return DateFormat('yyyyMMdd').format(shiftDate) == DateFormat('yyyyMMdd').format(leaveDate) &&
+               leaveData['leaveStatus'] == 'Approved'; 
+      });
+
+      if (hasLeave) continue;
+
+      absences.add(shiftData);
+    }
+    return absences;
   }
 
   // --- BUILD WIDGETS ---
   @override
   Widget build(BuildContext context) {
-    final attendanceStream = FirebaseFirestore.instance
-        .collection('attendances')
-        .where('attendanceUserId', isEqualTo: widget.workerID)
-        .where('attendanceDate', isGreaterThanOrEqualTo: Timestamp.fromDate(_getStartDate(_selectedPeriod)))
-        .orderBy('attendanceDate', descending: true)
-        .snapshots();
-
     return Scaffold(
       backgroundColor: bgLightBlue,
       appBar: AppBar(
@@ -56,122 +141,157 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
         backgroundColor: const Color(0xFF1A3E88),
         foregroundColor: Colors.white,
       ),
+      // Use Column instead of SingleChildScrollView for Expanded layout to work
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              const SizedBox(height: 10),     
+              // 1. Overall Attendance & Period Toggle at top
               _buildCard(
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
                     const Text("My Overall Attendance", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     const SizedBox(width: 10),
-                    
                     AttendanceRateWidget(
-                      userId: FirebaseAuth.instance.currentUser!.uid, // Use the logged-in user's ID
+                      userId: FirebaseAuth.instance.currentUser!.uid,
                     ),
                   ],
                 )),
 
+              const SizedBox(height: 10),
+
               _buildPeriodToggle(),
 
-              // Timesheet
-              _buildCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Center(
-                      child: Text(
-                          "Timesheet",
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              const SizedBox(height: 10),
+
+              // Single StreamBuilder for both lists
+              SizedBox(
+                height: 600,
+                child: StreamBuilder<ReportData>(
+                  stream: _masterReportStream,
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return const Center(child: Text("Error loading data"));
+                    }
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+
+                    _currentDocs = snapshot.data?.attendances ?? []; 
+                    _currentAbsences = snapshot.data?.absentList ?? []; 
+
+                    return Column(
+                      children: [
+                        // 2. Absent List (Takes roughly half of available space)
+                        Expanded(
+                          flex: 1,
+                          child: _buildCard(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Center(
+                                  child: Text("Missed Shifts", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.red)),
+                                ),
+                                const Divider(color: Colors.redAccent),
+                                Expanded(
+                                  child: _currentAbsences.isEmpty 
+                                    ? const Center(child: Text("Perfect attendance! No missed shifts.", style: TextStyle(color: Colors.green, fontWeight: FontWeight.w600)))
+                                    : Scrollbar(
+                                        controller: _absentScrollController,
+                                        thumbVisibility: true,
+                                        child: ListView.separated(
+                                          controller: _absentScrollController,
+                                          itemCount: _currentAbsences.length,
+                                          separatorBuilder: (context, index) => const Divider(height: 1),
+                                          itemBuilder: (context, i) {
+                                            DateTime date = (_currentAbsences[i]['shiftDate'] as Timestamp).toDate();
+                                            return ListTile(
+                                              contentPadding: EdgeInsets.zero,
+                                              leading: const Icon(Icons.warning_amber_rounded, color: Colors.red),
+                                              title: Text(DateFormat('dd MMM yyyy').format(date), style: const TextStyle(fontWeight: FontWeight.bold)),
+                                              subtitle: Text(_currentAbsences[i]['shiftType'] ?? "Scheduled Shift"),
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
-                    ),
-                    const Divider(color: Color(0xFF1A3E88)),
-                    const SizedBox(height: 10),
-                    
-                    // Fixed height container to enable internal scrolling
-                    SizedBox(
-                      height: 400, // Set the height you want for the scrollable area
-                      child: Scrollbar(
-                        controller: _timesheetScrollController,
-                        thumbVisibility: true, // Makes the scrollbar visible like in your design
-                        child: // Inside your Leave Requests _buildCard
-                          StreamBuilder<QuerySnapshot>(
-                            stream: attendanceStream,
-                            builder: (context, snapshot) {
-                              if (snapshot.hasError) {
-                                debugPrint("Firestore Error: ${snapshot.error}");
-                                return const Center(child: Text("Error loading data"));
-                              }
-                              if (snapshot.connectionState == ConnectionState.waiting) {
-                                return const Center(child: CircularProgressIndicator());
-                              }
 
-                              _currentDocs = snapshot.data?.docs ?? []; // Save for export
+                        const SizedBox(height: 10),
 
-                              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                                return const Center(child: Text("No attendance records found."));
-                              }
+                        // 3. Attendance List (Takes the other half of available space)
+                        Expanded(
+                          flex: 2,
+                          child: _buildCard(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Center(
+                                  child: Text("Timesheet", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                                ),
+                                const Divider(color: Color(0xFF1A3E88)),
+                                Expanded(
+                                  child: _currentDocs.isEmpty 
+                                    ? const Center(child: Text("No attendance records found."))
+                                    : Scrollbar(
+                                        controller: _timesheetScrollController,
+                                        thumbVisibility: true,
+                                        child: ListView.separated(
+                                          controller: _timesheetScrollController,
+                                          padding: const EdgeInsets.only(right: 10),
+                                          itemCount: _currentDocs.length,
+                                          separatorBuilder: (context, index) => const Divider(),
+                                          itemBuilder: (context, index) {
+                                            var data = _currentDocs[index].data() as Map<String, dynamic>;
 
-                              final docs = snapshot.data!.docs;
+                                            DateTime? start = _safeDate(data['attendanceStartTime']);
+                                            DateTime? end = _safeDate(data['attendanceEndTime']);
+                                            DateTime? date = _safeDate(data['attendanceDate']);
 
-                              return ListView.separated(
-                                controller: _timesheetScrollController,
-                                shrinkWrap: true,
-                                padding: const EdgeInsets.only(right: 10),
-                                itemCount: docs.length,
-                                separatorBuilder: (context, index) => const Divider(),
-                                itemBuilder: (context, index) {
-                                  var data = docs[index].data() as Map<String, dynamic>;
+                                            String formattedDate = date != null ? DateFormat('dd MMM').format(date) : "--";
+                                            String formattedIn = start != null ? DateFormat('hh:mm a').format(start) : "--:--";
+                                            String formattedOut = end != null ? DateFormat('hh:mm a').format(end) : "--:--";
+                                            String status = data['attendanceStatus'] ?? "Unscheduled";
+                                            String approval = data['attendanceApproval'] ?? "Pending";
 
-                                  DateTime? safeConvertToDateTime(dynamic value) {
-                                    if (value == null) return null;
-                                    if (value is Timestamp) return value.toDate();
-                                    if (value is String) return DateTime.tryParse(value);
-                                    return null;
-                                  }
+                                            String duration = "--";
+                                            if (start != null && end != null) {
+                                              Duration diff = end.difference(start);
+                                              duration = "${diff.inHours}h ${diff.inMinutes.remainder(60)}m";
+                                            }
 
-                                  // 1. Convert safely using the helper
-                                  DateTime? start = safeConvertToDateTime(data['attendanceStartTime']);
-                                  DateTime? end = safeConvertToDateTime(data['attendanceEndTime']);
-                                  DateTime? date = safeConvertToDateTime(data['attendanceDate']);
-
-                                  // 2. Format Strings
-                                  String formattedDate = date != null ? DateFormat('dd MMM').format(date) : "--";
-                                  String formattedIn = start != null ? DateFormat('hh:mm a').format(start) : "--:--";
-                                  String formattedOut = end != null ? DateFormat('hh:mm a').format(end) : "--:--";
-                                  String status = data['attendanceStatus'] ?? "Unscheduled";
-                                  String approval = data['attendanceApproval'] ?? "Pending";
-
-                                  // 3. Calculate Duration
-                                  String duration = "--";
-                                  if (start != null && end != null) {
-                                    Duration diff = end.difference(start);
-                                    duration = "${diff.inHours}h ${diff.inMinutes.remainder(60)}m";
-                                  }
-
-                                  return _buildTimesheetRow(
-                                    date: formattedDate,
-                                    clockIn: formattedIn,
-                                    clockOut: formattedOut,
-                                    duration: duration,
-                                    status: status,
-                                    approval: approval,
-                                  );
-                                },
-                              );
-                            },
-                          )
-                      ),
-                    ),
-                  ],
+                                            return _buildTimesheetRow(
+                                              date: formattedDate,
+                                              clockIn: formattedIn,
+                                              clockOut: formattedOut,
+                                              duration: duration,
+                                              status: status,
+                                              approval: approval,
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
 
               const SizedBox(height: 10),
 
+              // 4. Export PDF Button
               ElevatedButton.icon(
                 icon: const Icon(Icons.picture_as_pdf),
                 label: const Text("Export My Report", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
@@ -179,9 +299,11 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
                   backgroundColor: bgLightBlue,
                   foregroundColor: primaryBlue,
                   side: BorderSide(width: 2, color: primaryBlue),
-                  padding: EdgeInsets.all(20)),
+                  padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
+                  minimumSize: const Size(double.infinity, 50), // Makes button full width
+                ),
                 onPressed: () {
-                  if (_currentDocs.isEmpty) {
+                  if (_currentDocs.isEmpty && _currentAbsences.isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text("No data available for the selected period.")),
                     );
@@ -189,7 +311,8 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
                   }
                   PdfExportService.exportAttendanceReport(
                     title: "My Attendance Report",
-                    docs: _currentDocs, // This is the 'docs' variable from your StreamBuilder
+                    docs: _currentDocs, 
+                    absentShifts: _currentAbsences, 
                     period: _selectedPeriod,
                   );
                 },
@@ -208,16 +331,16 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(10),
-      margin: const EdgeInsets.symmetric(vertical: 10),
+      margin: const EdgeInsets.symmetric(vertical: 5),
       decoration: BoxDecoration(
         color: color ?? Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: primaryBlue, width: 2),
         boxShadow: const [
           BoxShadow(
-            color: Colors.blueGrey,
-            blurRadius: 10,
-            offset: Offset(2, 4),
+            color: Colors.black12,
+            blurRadius: 4,
+            offset: Offset(2, 2),
           ),
         ],
       ),
@@ -233,7 +356,6 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
     required String approval,
     required String status,
   }) {
-    // Define color based on status
     Color statusColor = status == "On-Time" 
         ? Colors.green 
         : status == "Late" ? Colors.red : Colors.orange;
@@ -246,42 +368,38 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Row(
         children: [
-          // Date Column
           Expanded(
             flex: 2,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Text(date, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
+                Text(date, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                 Text(status, style: TextStyle(color: statusColor, fontSize: 12, fontWeight: FontWeight.w600)),
               ],
             ),
           ),
-          // Time Info
           Expanded(
             flex: 3,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text("In: $clockIn", style: const TextStyle(fontSize: 15)),
-                Text("Out: $clockOut", style: const TextStyle(fontSize: 15)),
+                Text("In: $clockIn", style: const TextStyle(fontSize: 14)),
+                Text("Out: $clockOut", style: const TextStyle(fontSize: 14)),
               ],
             ),
           ),
-          // Duration Info
           Expanded(
             flex: 2,
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text(
                   duration,
-                  textAlign: TextAlign.right,
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey),
+                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.blueGrey, fontSize: 14),
                 ),
                 Text(
                   approval,
-                  textAlign: TextAlign.right,
-                  style: TextStyle(fontWeight: FontWeight.bold, color: approvalColor),
+                  style: TextStyle(fontWeight: FontWeight.bold, color: approvalColor, fontSize: 12),
                 ),
               ],
             ),
@@ -309,36 +427,26 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
 
   Widget _buildPeriodToggle() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
+      padding: const EdgeInsets.only(bottom: 10.0),
       child: SizedBox(
-        width: double.infinity, // 1. Force the container to full width
+        width: double.infinity,
         child: SegmentedButton<String>(
-          // 2. Hide the check icon to keep label centering consistent
           showSelectedIcon: false, 
           segments: const [
-            ButtonSegment(
-              value: "Weekly", 
-              label: Center(child: Text("Week")), // 3. Wrap label in Center
-            ),
-            ButtonSegment(
-              value: "Monthly", 
-              label: Center(child: Text("Month")),
-            ),
-            ButtonSegment(
-              value: "Yearly", 
-              label: Center(child: Text("Year")),
-            ),
+            ButtonSegment(value: "Weekly", label: Center(child: Text("Week"))),
+            ButtonSegment(value: "Monthly", label: Center(child: Text("Month"))),
+            ButtonSegment(value: "Yearly", label: Center(child: Text("Year"))),
           ],
           selected: {_selectedPeriod},
           onSelectionChanged: (Set<String> newSelection) {
             setState(() {
               _selectedPeriod = newSelection.first;
+              _initStreams(); // Automatically bind to new date constraints on tap
             });
           },
           style: SegmentedButton.styleFrom(
             selectedBackgroundColor: primaryBlue,
             selectedForegroundColor: bgLightBlue,
-            // 4. Ensure visual density is tight
             visualDensity: VisualDensity.comfortable,
             side: const BorderSide(width: 1, color: Colors.grey),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -347,4 +455,10 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
       ),
     );
   }
+}
+
+class ReportData {
+  final List<Map<String, dynamic>> absentList;
+  final List<QueryDocumentSnapshot> attendances;
+  ReportData(this.absentList, this.attendances);
 }

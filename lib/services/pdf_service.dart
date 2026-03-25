@@ -8,6 +8,7 @@ class PdfExportService {
   static Future<void> exportAttendanceReport({
     required String title,
     required List<QueryDocumentSnapshot> docs,
+    List<Map<String, dynamic>>? absentShifts,
     required String period,
   }) async {
     final pdf = pw.Document();
@@ -22,11 +23,51 @@ class PdfExportService {
               mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
               children: [
                 pw.Text(title, style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold)),
-                pw.Text("Period: $period", style: pw.TextStyle(fontSize: 12)),
+                pw.Text("Period: $period", style: const pw.TextStyle(fontSize: 12)),
               ],
             ),
           ),
+          
           pw.SizedBox(height: 20),
+
+          pw.Text("Absences List", style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
+          
+          // The Table
+          if (absentShifts == null || absentShifts.isEmpty)
+            pw.Text("No absent records for this period.")
+          else
+            pw.TableHelper.fromTextArray(
+              headerStyle: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+              headers: ['Date', 'Name', 'Schedule In', 'Schedule Out', 'Status'],
+              data: absentShifts.map((data) {
+                // Safe Date Formatting
+                String dateStr = "--";
+                if (data['shiftDate'] != null) {
+                  dateStr = DateFormat('yyyy-MM-dd').format((data['shiftDate'] as Timestamp).toDate());
+                }
+
+                // Safe Time Formatting
+                String timeIn = (data['shiftStartTime'] != null) 
+                    ? DateFormat.jm().format((data['shiftStartTime'] as Timestamp).toDate()) 
+                    : "--";
+                    
+                String timeOut = (data['shiftEndTime'] != null) 
+                    ? DateFormat.jm().format((data['shiftEndTime'] as Timestamp).toDate()) 
+                    : "--";
+
+                return [
+                  dateStr,
+                  (data['shiftUserName'] ?? "Unknown").toString(),
+                  timeIn,
+                  timeOut,
+                  "Absent"
+                ];
+              }).toList(),
+            ),
+
+          pw.SizedBox(height: 20),
+
+          pw.Text("Attendance List", style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
           
           // The Table
           pw.TableHelper.fromTextArray(

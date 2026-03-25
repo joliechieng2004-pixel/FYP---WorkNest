@@ -11,6 +11,10 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> {
+  // often use colors
+  final Color primaryBlue = const Color.fromARGB(255, 40, 75, 158);
+  final Color bgLightBlue = const Color.fromARGB(255, 240, 250, 255);
+  
   final _formKey = GlobalKey<FormState>();
   
   final TextEditingController _deptNameController = TextEditingController();
@@ -109,12 +113,17 @@ class _RegisterPageState extends State<RegisterPage> {
             decoration: InputDecoration(
               labelText: 'e.g. IT Department',
               enabledBorder: OutlineInputBorder(
-                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                borderSide: BorderSide(color: primaryBlue, width: 2),
                 borderRadius: BorderRadius.circular(20)),
               focusedBorder: OutlineInputBorder(
-                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
-                borderRadius: BorderRadius.circular(20)
-                )
+                borderSide: BorderSide(color: primaryBlue, width: 2),
+                borderRadius: BorderRadius.circular(20)),
+              errorBorder: OutlineInputBorder(
+                borderSide: const BorderSide(color: Colors.red, width: 2),
+                borderRadius: BorderRadius.circular(20)),
+              focusedErrorBorder: OutlineInputBorder(
+                borderSide: const BorderSide(color: Colors.red, width: 2),
+                borderRadius: BorderRadius.circular(20)),
             ),
             validator: (value) => _requiredValidator(value, 'Dept Name'),
           ),
@@ -129,8 +138,13 @@ class _RegisterPageState extends State<RegisterPage> {
                 borderRadius: BorderRadius.circular(20)),
               focusedBorder: OutlineInputBorder(
                 borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
-                borderRadius: BorderRadius.circular(20)
-                )
+                borderRadius: BorderRadius.circular(20)),
+              errorBorder: OutlineInputBorder(
+                borderSide: const BorderSide(color: Colors.red, width: 2),
+                borderRadius: BorderRadius.circular(20)),
+              focusedErrorBorder: OutlineInputBorder(
+                borderSide: const BorderSide(color: Colors.red, width: 2),
+                borderRadius: BorderRadius.circular(20)),
             ),
             validator: (value) => _requiredValidator(value, 'First Name'),
           ),
@@ -145,8 +159,13 @@ class _RegisterPageState extends State<RegisterPage> {
                 borderRadius: BorderRadius.circular(20)),
               focusedBorder: OutlineInputBorder(
                 borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
-                borderRadius: BorderRadius.circular(20)
-                )
+                borderRadius: BorderRadius.circular(20)),
+              errorBorder: OutlineInputBorder(
+                borderSide: const BorderSide(color: Colors.red, width: 2),
+                borderRadius: BorderRadius.circular(20)),
+              focusedErrorBorder: OutlineInputBorder(
+                borderSide: const BorderSide(color: Colors.red, width: 2),
+                borderRadius: BorderRadius.circular(20)),
             ),
             validator: (value) => _requiredValidator(value, 'Last Name'),
           ),
@@ -161,8 +180,13 @@ class _RegisterPageState extends State<RegisterPage> {
                 borderRadius: BorderRadius.circular(20)),
               focusedBorder: OutlineInputBorder(
                 borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
-                borderRadius: BorderRadius.circular(20)
-                )
+                borderRadius: BorderRadius.circular(20)),
+              errorBorder: OutlineInputBorder(
+                borderSide: const BorderSide(color: Colors.red, width: 2),
+                borderRadius: BorderRadius.circular(20)),
+              focusedErrorBorder: OutlineInputBorder(
+                borderSide: const BorderSide(color: Colors.red, width: 2),
+                borderRadius: BorderRadius.circular(20)),
             ),
             validator: (value) => _requiredValidator(value, 'Contact Number'),
           ),
@@ -177,9 +201,15 @@ class _RegisterPageState extends State<RegisterPage> {
                 borderRadius: BorderRadius.circular(20)),
               focusedBorder: OutlineInputBorder(
                 borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
-                borderRadius: BorderRadius.circular(20)
-                )
+                borderRadius: BorderRadius.circular(20)),
+              errorBorder: OutlineInputBorder(
+                borderSide: const BorderSide(color: Colors.red, width: 2),
+                borderRadius: BorderRadius.circular(20)),
+              focusedErrorBorder: OutlineInputBorder(
+                borderSide: const BorderSide(color: Colors.red, width: 2),
+                borderRadius: BorderRadius.circular(20)),
             ),
+            validator: (value) => _requiredValidator(value, 'Email'),
           ),
           const SizedBox(height: 10),
           const Text("Password:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
@@ -199,31 +229,37 @@ class _RegisterPageState extends State<RegisterPage> {
                 borderRadius: BorderRadius.circular(20)),
               focusedBorder: OutlineInputBorder(
                 borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
-                borderRadius: BorderRadius.circular(20)
-                )
+                borderRadius: BorderRadius.circular(20)),
+              errorBorder: OutlineInputBorder(
+                borderSide: const BorderSide(color: Colors.red, width: 2),
+                borderRadius: BorderRadius.circular(20)),
+              focusedErrorBorder: OutlineInputBorder(
+                borderSide: const BorderSide(color: Colors.red, width: 2),
+                borderRadius: BorderRadius.circular(20)),
             ),
+            validator: (value) => _requiredValidator(value, 'Password'),
           ),
           const SizedBox(height: 10),
           const Text("Confirm Password:", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
           TextFormField(
             controller: _confirmPasswordController,
-            obscureText: _obscurePassword,
+            obscureText: true,
             decoration: InputDecoration(
               labelText: 'Re-enter your password',
-                  suffixIcon: IconButton(
-                icon: Icon(
-                  _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                ),
-                onPressed: _togglePasswordVisibility,
-              ),
               enabledBorder: OutlineInputBorder(
                 borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
                 borderRadius: BorderRadius.circular(20)),
               focusedBorder: OutlineInputBorder(
                 borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
-                borderRadius: BorderRadius.circular(20)
-              )
+                borderRadius: BorderRadius.circular(20)),
+              errorBorder: OutlineInputBorder(
+                borderSide: const BorderSide(color: Colors.red, width: 2),
+                borderRadius: BorderRadius.circular(20)),
+              focusedErrorBorder: OutlineInputBorder(
+                borderSide: const BorderSide(color: Colors.red, width: 2),
+                borderRadius: BorderRadius.circular(20)),
             ),
+            validator: (value) => _requiredValidator(value, 'Confirm Password'),
           ),
         ],
       ),

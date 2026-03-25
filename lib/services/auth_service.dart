@@ -178,9 +178,15 @@ class AuthService {
     required String email,
     required String password,
     required String deptCode,
-    required String expectedRole,
   }) async {
     try {
+      // Check department code existence
+      DocumentSnapshot deptDoc = await _db.collection('departments').doc(deptCode).get();
+    
+      if (!deptDoc.exists) {
+        return "Department does not exist.";
+      }
+
       // 1. Authenticate
       UserCredential result = await _auth.signInWithEmailAndPassword(
         email: email, 
@@ -193,18 +199,18 @@ class AuthService {
 
         if (userDoc.exists) {
           String actualDeptCode = userDoc.get('deptCode');
-          String actualRole = userDoc.get('userRole');
 
           // 3. Check if Dept Code and Role match the Radio Button/Input
-          if (actualDeptCode == deptCode && actualRole == expectedRole) {
+          if (actualDeptCode == deptCode) {
             return null; // SUCCESS (No error message)
           } else {
             await _auth.signOut();
-            return "Incorrect Department Code or User Role selected.";
+            return "Incorrect Department Code.";
           }
         }
+        return "User profile not found.";
       }
-      return "User profile not found.";
+      return "Authentication failed.";
     } on FirebaseAuthException catch (e) {
       return e.message; // Return the Firebase error (e.g., "Wrong password")
     } catch (e) {
@@ -268,7 +274,7 @@ class AuthService {
 
       // 4. Atomic Write
       await _db.collection('attendances').doc("${todayDate}_$uid").set({
-        'attendanceUserId': uid,
+        'attendanceUserID': uid,
         'attendanceUserName': fullName,
         'deptCode': deptCode,
         'attendanceLocation': location,

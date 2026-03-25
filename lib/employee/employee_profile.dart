@@ -303,7 +303,7 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: ElevatedButton(
-                                  onPressed: _isOffline ? null : () => _changeProfileConfirmation(), 
+                                  onPressed: _isOffline ? null : _changeProfileConfirmation, 
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: _isOffline ? Colors.grey : const Color.fromARGB(255, 40, 75, 158),
                                     foregroundColor: Colors.white,
@@ -373,7 +373,7 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: ElevatedButton(
-                                  onPressed: _isOffline ? null : () => _validateAndUpdatePassword(),
+                                  onPressed: _isOffline ? null : _validateAndUpdatePassword,
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: _isOffline ? Colors.grey : const Color.fromARGB(255, 40, 75, 158),
                                     foregroundColor: Colors.white,
@@ -439,7 +439,7 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: ElevatedButton(
-                                  onPressed: _isOffline ? null : () => _updateNotificationSettings, 
+                                  onPressed: _isOffline ? null : _updateNotificationSettings, 
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: _isOffline ? Colors.grey : const Color.fromARGB(255, 40, 75, 158),
                                     foregroundColor: Colors.white,

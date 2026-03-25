@@ -39,13 +39,7 @@ class _LoginPageState extends State<LoginPage> {
               const SizedBox(height: 20),
               const Text("LOGIN PAGE", style: TextStyle(fontSize: 30, fontWeight:FontWeight.bold, fontFamily: "Roboto-Bold", color: Color.fromARGB(255, 40, 75, 158)),),
               const SizedBox(height: 20),
-              Column(
-                children: [
-                  LoginRadioButton(),
-                  const SizedBox(height: 10),
-                  LoginForm(),
-                ],
-              ),
+              LoginForm(),
               const SizedBox(height: 30),
               LoginLoginButton(),
               LoginRegisterButton(),
@@ -147,55 +141,20 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Row LoginRadioButton() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center, // Centers the group
-      children: [
-        // --- Employee Option ---
-        Radio<String>(
-          value: "employee",
-          groupValue: _selectedRole,
-          onChanged: (value) {
-            setState(() {
-              _selectedRole = value!;
-            });
-          },
-        ),
-
-        const Text("Employee", style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-
-        const SizedBox(width: 20), // Spacing between the two options
-        
-        // --- Manager Option ---
-        Radio<String>(
-          value: "manager",
-          groupValue: _selectedRole,
-          onChanged: (value) {
-            setState(() {
-              _selectedRole = value!;
-            });
-          },
-        ),
-
-        const Text("Manager", style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-      ],
-    );
-  }
-
   void _handleLogin() async {
   // 1. Get values from controllers and the radio button
   String enteredEmail = _emailController.text.trim();
   String enteredPassword = _passwordController.text.trim();
   String enteredDeptCode = _deptCodeController.text.trim();
-  String selectedRole = _selectedRole; // This is the value from your Radio buttons!
 
   // 2. Call AuthService (Updated to check role too)
   String? result = await _authService.loginUser(
     email: enteredEmail,
     password: enteredPassword,
     deptCode: enteredDeptCode,
-    expectedRole: selectedRole, // Pass the radio button value here
   );
+
+  if (!mounted) return;
 
   if (result == null) {
      // Success! Navigate based on the radio button value
