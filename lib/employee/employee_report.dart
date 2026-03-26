@@ -156,9 +156,13 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
                   children: [
                     const Text("My Overall Attendance", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     const SizedBox(width: 10),
-                    AttendanceRateWidget(
-                      userId: FirebaseAuth.instance.currentUser!.uid,
-                    ),
+                    FutureBuilder<double>(
+                      future: AttendanceCount.getAttendanceRate(widget.workerID),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) return CircularProgressIndicator();
+                        return Text("${snapshot.data?.toStringAsFixed(0)}%");
+                      },
+                    )
                   ],
                 )),
 
@@ -170,7 +174,7 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
 
               // Single StreamBuilder for both lists
               SizedBox(
-                height: 600,
+                height: 800,
                 child: StreamBuilder<ReportData>(
                   stream: _masterReportStream,
                   builder: (context, snapshot) {
@@ -208,12 +212,25 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
                                           itemCount: _currentAbsences.length,
                                           separatorBuilder: (context, index) => const Divider(height: 1),
                                           itemBuilder: (context, i) {
-                                            DateTime date = (_currentAbsences[i]['shiftDate'] as Timestamp).toDate();
+                                            final data = _currentAbsences[i];
+                                            DateTime date = (data['shiftDate'] as Timestamp).toDate();
+
+                                            // Inline formatting for the subtitle (startTime - endTime)
+                                            String startTime = data['shiftStartTime'] != null 
+                                                ? DateFormat('hh:mm a').format((data['shiftStartTime'] as Timestamp).toDate()) 
+                                                : "--:--";
+                                            String endTime = data['shiftEndTime'] != null 
+                                                ? DateFormat('hh:mm a').format((data['shiftEndTime'] as Timestamp).toDate()) 
+                                                : "--:--";
+
                                             return ListTile(
                                               contentPadding: EdgeInsets.zero,
                                               leading: const Icon(Icons.warning_amber_rounded, color: Colors.red),
-                                              title: Text(DateFormat('dd MMM yyyy').format(date), style: const TextStyle(fontWeight: FontWeight.bold)),
-                                              subtitle: Text(_currentAbsences[i]['shiftType'] ?? "Scheduled Shift"),
+                                              title: Text(
+                                                DateFormat('dd MMM yyyy').format(date), 
+                                                style: const TextStyle(fontWeight: FontWeight.bold)
+                                              ),
+                                              subtitle: Text("$startTime - $endTime"),
                                             );
                                           },
                                         ),

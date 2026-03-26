@@ -1,66 +1,56 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
 
-class AttendanceRateWidget extends StatelessWidget {
-  final String userId;
-
-  const AttendanceRateWidget({super.key, required this.userId});
-
-  Future<double> _calculateRate() async {
-    // 1. Get total scheduled shifts
-    AggregateQuerySnapshot scheduledQuery = await FirebaseFirestore.instance
+class AttendanceCount {
+  /// Private helper to avoid repeating Firebase code
+  static Future<Map<String, int>> _getRawCounts(String workerID) async {
+    final scheduledQuery = await FirebaseFirestore.instance
         .collection('shifts')
-        .where('shiftUserID', isEqualTo: userId)
+        .where('shiftUserID', isEqualTo: workerID)
         .count()
         .get();
 
-    // 2. Get total attendance records
-    AggregateQuerySnapshot attendedQuery = await FirebaseFirestore.instance
+    final attendedQuery = await FirebaseFirestore.instance
         .collection('attendances')
-        .where('attendanceUserId', isEqualTo: userId)
-        //.where('attendanceApproval', isEqualTo: 'Approved')
+        .where('attendanceUserID', isEqualTo: workerID)
         .count()
         .get();
 
-    int scheduledCount = scheduledQuery.count ?? 0;
-    int attendedCount = attendedQuery.count ?? 0;
+    return {
+      'scheduled': scheduledQuery.count ?? 0,
+      'attended': attendedQuery.count ?? 0,
+    };
+  }
 
-    if (scheduledCount == 0) return 0.0;
+  /// Returns the percentage of shifts attended: 
+  /// (Attended / Scheduled) * 100
+  static Future<double> getAttendanceRate(String workerID) async {
+    final stats = await _getRawCounts(workerID);
+    if (stats['scheduled'] == 0) return 0.0;
     
-    // Formula: (Attended / Scheduled) * 100
-    return (attendedCount / scheduledCount) * 100;
+    return (stats['attended']! / stats['scheduled']!) * 100;
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<double>(
-      future: _calculateRate(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          print(snapshot.error);
-        }
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const SizedBox(
-            width: 15, height: 15, 
-            child: CircularProgressIndicator(strokeWidth: 2)
-          );
-        }
-        
-        double rate = snapshot.data ?? 0.0;
-        return Text(
-          "${rate.toStringAsFixed(0)}%",
-          style: TextStyle(fontWeight: FontWeight.bold, color: _getColor(rate)),
-        );
-      },
-    );
+  /// Returns the total number of missed shifts:
+  /// (Scheduled - Attended)
+  static Future<int> getAbsentCount(String workerID) async {
+    final stats = await _getRawCounts(workerID);
+    int absent = stats['scheduled']! - stats['attended']!;
+    return absent < 0 ? 0 : absent;
   }
-}
 
-Color? _getColor(double rate) {
-  if (rate == 100)
-    {return Colors.green;}
-  else if (rate >= 60 && rate <= 99)
-    {return Colors.yellow;}
-  else
-    {return Colors.red;}
+  /// PRO-TIP: Returns both values in one go. 
+  /// Use this for your Pop-up to save on Firebase performance!
+  static Future<Map<String, dynamic>> getFullAttendanceStats(String workerID) async {
+    final stats = await _getRawCounts(workerID);
+    int scheduled = stats['scheduled']!;
+    int attended = stats['attended']!;
+    
+    double rate = scheduled == 0 ? 0.0 : (attended / scheduled) * 100;
+    int absent = (scheduled - attended) < 0 ? 0 : (scheduled - attended);
+
+    return {
+      'rate': rate,
+      'absent': absent,
+    };
+  }
 }

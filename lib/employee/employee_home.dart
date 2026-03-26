@@ -635,14 +635,14 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
     User? user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    try {
-      // Show loading while verifying location and talking to Firebase
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(child: CircularProgressIndicator())
-      );
+    // Show loading while verifying location and talking to Firebase
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator())
+    );
 
+    try {
       // --- FETCH DYNAMIC SETTINGS ---
       Map<String, bool> settings = await _getDepartmentSettings();
       bool requireGPS = settings['requireGPS']!;
@@ -655,7 +655,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
         bool hasPermission = await LocationService.handleLocationPermission();
 
         if (!hasPermission) {
-          if (mounted) Navigator.pop(context);
+          _dismissSpinner();
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Location permissions denied."), backgroundColor: Colors.red));
           return;
         }
@@ -669,7 +669,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
         );
 
         if (distanceInMeters > officeRadius) {
-          if (mounted) Navigator.pop(context);
+          _dismissSpinner();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text("Too far to clock out: ${distanceInMeters.toInt()}m away."), backgroundColor: Colors.red)
           );
@@ -686,7 +686,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
       bool faceVerified = true;
       
       if (requireFace) {
-        if (mounted && Navigator.canPop(context)) Navigator.pop(context);
+        _dismissSpinner();
         
         // Face verification screen placeholder
         if (AppConfig.useFaceVerificationStub) {
@@ -699,14 +699,16 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
         }
       }
 
-      if (faceVerified){
+      if (faceVerified && mounted){
         // Re-open Loading Spinner for the database write
         showDialog(
           context: context,
           barrierDismissible: false,
           builder: (context) => const Center(child: CircularProgressIndicator()),
         );
+      }
 
+      if (faceVerified){
         // Call the backend service function
         String? error = await _authService.clockOutUser(uid: user.uid);
 
@@ -732,7 +734,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
     } catch (e) {
       if (mounted && Navigator.canPop(context)) Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e")));
-    }
+    } finally {_dismissSpinner();}
   }
 
   // --- CLOCK OUT CONFIRMATION (Handles Rules 1 & 2) ---
@@ -977,5 +979,12 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
         );
       },
     );
+  }
+
+  // Helper to safely close the dialog
+  void _dismissSpinner() {
+    if (mounted && Navigator.canPop(context)) {
+      Navigator.pop(context);
+    }
   }
 }

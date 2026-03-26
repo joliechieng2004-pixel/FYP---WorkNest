@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:worknest/services/attendance_count.dart';
 import 'package:worknest/services/auth_service.dart';
 import 'package:worknest/services/connectivity_service.dart';
+import 'package:worknest/widget/employee_profile_dialog.dart';
 
 class ManagerEmployee extends StatefulWidget {
   final String deptCode;
@@ -16,6 +18,9 @@ class ManagerEmployee extends StatefulWidget {
 }
 
 class _ManagerEmployeePageState extends State<ManagerEmployee> {
+  final Color primaryBlue = const Color.fromARGB(255, 40, 75, 158);
+  final Color bgLightBlue = const Color.fromARGB(255, 240, 250, 255);
+
   final TextEditingController _searchController = TextEditingController();
   
   // check connection
@@ -90,10 +95,6 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               child: FirstRowElements(),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: WorkerFilter(),
             ),
             const Padding(
               padding: EdgeInsets.only(left: 20, top: 10),
@@ -176,10 +177,9 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
       child: const Row(
         children: [
-          Expanded(flex: 1, child: Center(child: Text("ID", style: TextStyle(fontWeight: FontWeight.bold)))),
           Expanded(flex: 3, child: Center(child: Text("Name", style: TextStyle(fontWeight: FontWeight.bold)))),
-          Expanded(flex: 2, child: Center(child: Text("Attendance", style: TextStyle(fontWeight: FontWeight.bold)))),
-          Expanded(flex: 2, child: Center(child: Text("Status", style: TextStyle(fontWeight: FontWeight.bold)))),
+          Expanded(flex: 3, child: Center(child: Text("Enroll Date", style: TextStyle(fontWeight: FontWeight.bold)))),
+          Expanded(flex: 3, child: Center(child: Text("Attendance", style: TextStyle(fontWeight: FontWeight.bold)))),
         ],
       ),
     );
@@ -192,9 +192,9 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
     Map<String, dynamic> worker = doc.data() as Map<String, dynamic>;
     String fName = worker['userFName' ] ?? 'Unknown';
     String lName = worker['userLName' ] ?? 'Unknown';
-    String status = (worker['isActive'] ?? true) ? "Active" : "Inactive";
-    // For now, ID can be the last 3 digits of the Doc ID or a specific field
-    String workerId = doc.id.substring(doc.id.length - 3).toUpperCase();
+    DateTime? addDate = _safeDate(worker['createdAt']);
+    String formattedDate = addDate != null ? DateFormat('dd MMM').format(addDate) : "--";
+    String workerID = doc.id;
 
     return GestureDetector(
       onTap: () {
@@ -217,17 +217,18 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
             // Basic Info Row
             Row(
               children: [
-                Expanded(flex: 1, child: Center(child: Text(workerId, style: const TextStyle(fontWeight: FontWeight.bold)))),
                 Expanded(flex: 3, child: Center(child: Text("$fName $lName"))),
-                Expanded(flex: 2, child: Center(child: AttendanceRateWidget(userId: doc.id))),
-                Expanded(
-                  flex: 2, 
-                  child: Center(
-                    child: Text(status, 
-                      style: TextStyle(color: status == "Active" ? Colors.green : Colors.red, fontWeight: FontWeight.bold)
-                    )
+                Expanded(flex: 3, child: Center(child: Text(formattedDate))),
+                Expanded(flex: 3, child: Center(
+                  child: FutureBuilder<double>(
+                    future: AttendanceCount.getAttendanceRate(workerID),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) return CircularProgressIndicator();
+                      return Text("${snapshot.data?.toStringAsFixed(0)}%");
+                    },
                   )
-                ),
+                )),
+                Expanded(flex: 1, child: Icon(isExpanded ? Icons.expand_less : Icons.expand_more, size: 18)),
               ],
             ),
             
@@ -238,6 +239,7 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   _actionButton("View Profile", Colors.white, () {
+                    _openWorkerProfile(worker, workerID);
                     print("Viewing profile of $fName $lName");
                   }),
                   _actionButton("Remove Worker", Colors.white, () {
@@ -253,7 +255,7 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
 
   Widget _actionButton(String label, Color color, VoidCallback onPressed, {bool isDelete = false}) {
     return OutlinedButton(
-      onPressed: _isOffline ? null : () => onPressed,
+      onPressed: _isOffline ? null : onPressed,
       style: OutlinedButton.styleFrom(
         side: const BorderSide(color: Colors.black87),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -265,9 +267,6 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
   }
 
   // --- STUBS FOR YOUR EXISTING WIDGETS ---
-  Widget WorkerFilter() {
-    return const Row(children: [Icon(Icons.filter_list), SizedBox(width: 5), Text("Filter")]);
-  }
 
   Widget FirstRowElements() {
     return Row(
@@ -276,7 +275,7 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
         // Search Bar Implementation
         Expanded(
           child: Container(
-            height: 45,
+            height: 35,
             margin: const EdgeInsets.only(right: 12),
             child: TextField(
               controller: _searchController,
@@ -287,10 +286,10 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
               },
               decoration: InputDecoration(
                 hintText: "Search name...",
-                prefixIcon: const Icon(Icons.search, size: 20, color: Color(0xFF1A3E88)),
+                prefixIcon: Icon(Icons.search, size: 20, color: primaryBlue),
                 suffixIcon: _searchQuery.isNotEmpty 
                   ? IconButton(
-                      icon: const Icon(Icons.clear, size: 20),
+                      icon: Icon(Icons.clear, size: 20, color: primaryBlue),
                       onPressed: () {
                         _searchController.clear();
                         setState(() { _searchQuery = ""; });
@@ -299,17 +298,23 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
                   : null,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 15),
                 filled: true,
-                fillColor: Colors.grey.shade100,
+                fillColor: Colors.white,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none,
+                  borderRadius: BorderRadius.circular(20),
+                  borderSide: BorderSide(color: primaryBlue, width: 2.0)
                 ),
               ),
             ),
           ),
         ),
-        OutlinedButton.icon(
+        ElevatedButton.icon(
           onPressed: _isOffline ? null : addWorker,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.white,
+            foregroundColor: primaryBlue,
+            side: BorderSide(color: primaryBlue),
+            padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
+          ),
           icon: _isOffline ? const Icon(Icons.signal_wifi_connected_no_internet_4) : const Icon(Icons.add, size: 18),
           label: Text(_isOffline ? "No Internet" : "Add"),
         )
@@ -483,10 +488,50 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
     }
   }
 
+  void _openWorkerProfile(Map<String, dynamic> workerData, String workerID) async {
+    // 1. Show a simple loading indicator so the user knows something is happening
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    try {
+      // 2. Fetch the combined stats (Rate and Absent Count) in one call
+      final stats = await AttendanceCount.getFullAttendanceStats(workerID);
+
+      // 3. Close the loading indicator
+      if (mounted) Navigator.pop(context);
+
+      // 4. Open the actual Profile Dialog with REAL data
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => EmployeeProfileDialog(
+            workerData: workerData,
+            attendanceRate: stats['rate'], // Dynamic double
+            totalAbsences: stats['absent'], // Dynamic int
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) Navigator.pop(context); // Close loader on error
+      debugPrint("Error fetching worker stats: $e");
+    }
+  }
+
   // Helper for showing messages
   void _showSnackBar(String message, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), backgroundColor: color),
     );
+  }
+
+  // Helper for safe date conversion
+  DateTime? _safeDate(dynamic value) {
+    if (value == null) return null;
+    if (value is Timestamp) return value.toDate();
+    if (value is String) return DateTime.tryParse(value);
+    return null;
   }
 }
