@@ -5,22 +5,19 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:worknest/services/auth_wrapper.dart';
 import 'package:worknest/services/connectivity_service.dart';
+import 'package:worknest/utils/app_colors.dart';
 
 class EmployeeProfile extends StatefulWidget {
   final String deptCode;
-  final String workerID;
+  final String employeeID;
 
-  const EmployeeProfile({super.key, required this.deptCode, required this.workerID});
+  const EmployeeProfile({super.key, required this.deptCode, required this.employeeID});
 
   @override
   State<EmployeeProfile> createState() => _EmployeeProfilePageState();
 }
 
 class _EmployeeProfilePageState extends State<EmployeeProfile> {
-  // often use colors
-  final Color primaryBlue = const Color.fromARGB(255, 40, 75, 158);
-  final Color bgLightBlue = const Color.fromARGB(255, 240, 250, 255);
-
   final TextEditingController _profileFNameController = TextEditingController();
   final TextEditingController _profileLNameController = TextEditingController();
   final TextEditingController _profileEmailController = TextEditingController();
@@ -146,7 +143,7 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: bgLightBlue,
+      backgroundColor: AppColors.bgLightBlue,
       appBar: AppBar(
         title: const Text("Profile"),
         centerTitle: true,
@@ -159,7 +156,7 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Worker Profile
+              // Employee Profile
               _buildCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -488,7 +485,7 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
       decoration: BoxDecoration(
         color: color ?? Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: primaryBlue, width: 2),
+        border: Border.all(color: AppColors.primaryBlue, width: 2),
         boxShadow: const [
           BoxShadow(
             color: Colors.blueGrey,
@@ -514,7 +511,7 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
       children: [
         ListTile(
           contentPadding: EdgeInsets.zero,
-          leading: Icon(icon, color: primaryBlue),
+          leading: Icon(icon, color: AppColors.primaryBlue),
           title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
           trailing: Icon(isExpanded ? Icons.arrow_drop_up : Icons.arrow_drop_down),
           onTap: () {
@@ -861,7 +858,7 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Row(
             children: [
-              Icon(Icons.logout, color: primaryBlue),
+              Icon(Icons.logout, color: AppColors.primaryBlue),
               const SizedBox(width: 10),
               const Text("Confirm Logout"),
             ],

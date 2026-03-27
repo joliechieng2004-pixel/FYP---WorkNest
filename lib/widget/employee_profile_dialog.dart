@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 class EmployeeProfileDialog extends StatelessWidget {
-  final Map<String, dynamic> workerData;
+  final Map<String, dynamic> employeeData;
   final double attendanceRate;
   final int totalAbsences;
 
   const EmployeeProfileDialog({
     super.key,
-    required this.workerData,
+    required this.employeeData,
     required this.attendanceRate,
     required this.totalAbsences,
   });
@@ -19,14 +19,14 @@ class EmployeeProfileDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    String fullName = "${workerData['userFName'] ?? ''} ${workerData['userLName'] ?? 'Unknown User'}";
-    String email = workerData['userEmail'] ?? "No email provided";
-    String contact = workerData['userContact'] ?? "No contact provided";
+    String fullName = "${employeeData['userFName'] ?? ''} ${employeeData['userLName'] ?? 'Unknown User'}";
+    String email = employeeData['userEmail'] ?? "No email provided";
+    String contact = employeeData['userContact'] ?? "No contact provided";
     
     // Formatting the 'adding date' (createdAt)
     String joinedDate = "Unknown";
-    if (workerData['createdAt'] != null) {
-      DateTime date = (workerData['createdAt']).toDate();
+    if (employeeData['createdAt'] != null) {
+      DateTime date = (employeeData['createdAt']).toDate();
       joinedDate = DateFormat('dd MMM yyyy').format(date);
     }
 
@@ -48,7 +48,7 @@ class EmployeeProfileDialog extends StatelessWidget {
               radius: 40,
               backgroundColor: primaryBlue,
               child: Text(
-                workerData['userFName']?[0].toUpperCase() ?? "?",
+                employeeData['userFName']?[0].toUpperCase() ?? "?",
                 style: const TextStyle(fontSize: 32, color: Colors.white, fontWeight: FontWeight.bold),
               ),
             ),

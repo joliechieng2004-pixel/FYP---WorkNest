@@ -7,6 +7,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:worknest/services/auth_wrapper.dart';
 import 'package:worknest/services/connectivity_service.dart';
 import 'package:worknest/services/location_service.dart';
+import 'package:worknest/utils/app_colors.dart';
 import 'package:worknest/widget/location_picker.dart';
 
 class ManagerProfile extends StatefulWidget {
@@ -19,10 +20,6 @@ class ManagerProfile extends StatefulWidget {
 }
 
 class _ManagerProfilePageState extends State<ManagerProfile> {
-  // often use colors
-  final Color primaryBlue = const Color.fromARGB(255, 40, 75, 158);
-  final Color bgLightBlue = const Color.fromARGB(255, 240, 250, 255);
-
   final TextEditingController _profileFNameController = TextEditingController();
   final TextEditingController _profileLNameController = TextEditingController();
   final TextEditingController _profileEmailController = TextEditingController();
@@ -62,6 +59,7 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
   int? gracePeriod;
   int? radiusMeter;
   GeoPoint? officeLocation;
+  // ignore: unused_field
   bool _isLoadingSettings = true;
 
   int _expandedIndex = 0;
@@ -245,7 +243,7 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: bgLightBlue,
+      backgroundColor: AppColors.bgLightBlue,
       appBar: AppBar(
         title: const Text("Profile"),
         centerTitle: true,
@@ -588,23 +586,24 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                                       style: const TextStyle(fontSize: 16, color: Colors.black87),
                                     ),
                                     const SizedBox(height: 10),
-                                    ElevatedButton.icon(
-                                      onPressed: _isOffline ? null : () => _pickLocationFromMap(context), 
-                                      icon: _isOffline ? const Icon(Icons.signal_wifi_connected_no_internet_4) : const Icon(Icons.map_rounded),
-                                      label: Text(_isOffline ? "No Internet" : "Select on Map"),
-                                    ),
                                     Row(
                                       mainAxisAlignment: MainAxisAlignment.start,
                                       children: [
-                                        ElevatedButton.icon(
-                                          onPressed: _isOffline ? null : _testOfficeRange,
-                                          icon: _isOffline ? const Icon(Icons.signal_wifi_connected_no_internet_4) : const Icon(Icons.checklist_rounded),
-                                          label: Text(_isOffline ? "No Internet" : "Test Geofence"),
+                                        Expanded(
+                                          child: ElevatedButton.icon(
+                                            onPressed: _isOffline ? null : () => _pickLocationFromMap(context), 
+                                            icon: _isOffline ? const Icon(Icons.signal_wifi_connected_no_internet_4) : const Icon(Icons.map_rounded),
+                                            label: Text(_isOffline ? "No Internet" : "Select on Map"),
+                                          ),
                                         ),
-                                        const SizedBox(width: 20),
-                                        if (currentDistance != null)
-                                          Text("Distance to Office: ${currentDistance!.toInt()}m", 
-                                            style: TextStyle(color: currentDistance! <= 50 ? Colors.green : Colors.red)),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: ElevatedButton.icon(
+                                            onPressed: _isOffline ? null : _testOfficeRange,
+                                            icon: _isOffline ? const Icon(Icons.signal_wifi_connected_no_internet_4) : const Icon(Icons.checklist_rounded),
+                                            label: Text(_isOffline ? "Offline" : "Test"),
+                                          ),
+                                        ),
                                       ]
                                     ),
                                   ],
@@ -785,7 +784,7 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
       decoration: BoxDecoration(
         color: color ?? Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: primaryBlue, width: 2),
+        border: Border.all(color: AppColors.primaryBlue, width: 2),
         boxShadow: const [
           BoxShadow(
             color: Colors.blueGrey,
@@ -812,7 +811,7 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
       children: [
         ListTile(
           contentPadding: EdgeInsets.zero,
-          leading: Icon(icon, color: primaryBlue),
+          leading: Icon(icon, color: AppColors.primaryBlue),
           title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
           trailing: Icon(isExpanded ? Icons.arrow_drop_up : Icons.arrow_drop_down),
           onTap: () {
@@ -1236,7 +1235,7 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
     });
 
     if (currentDistance! <= 50) {
-      _showSnackBar("Test Passed: You are in range!", Colors.green);
+      _showSnackBar("Test Passed: ${currentDistance!.toInt()}m away from office!", Colors.green);
     } else {
       _showSnackBar("Test Failed: You are ${currentDistance!.toInt()}m away.", Colors.red);
     }
@@ -1269,11 +1268,11 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
       builder: (BuildContext context) {
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Row(
+          title: const Row(
             children: [
-              Icon(Icons.logout, color: primaryBlue),
-              const SizedBox(width: 10),
-              const Text("Confirm Logout"),
+              Icon(Icons.logout, color: AppColors.primaryBlue),
+              SizedBox(width: 10),
+              Text("Confirm Logout"),
             ],
           ),
           content: const Text("Are you sure you want to log out of WorkNest?"),

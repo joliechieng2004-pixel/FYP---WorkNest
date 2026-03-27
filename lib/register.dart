@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:worknest/services/auth_service.dart';
+import 'package:worknest/utils/app_colors.dart';
 import 'package:worknest/widget/verify_email_page.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -11,10 +12,6 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> {
-  // often use colors
-  final Color primaryBlue = const Color.fromARGB(255, 40, 75, 158);
-  final Color bgLightBlue = const Color.fromARGB(255, 240, 250, 255);
-  
   final _formKey = GlobalKey<FormState>();
   
   final TextEditingController _deptNameController = TextEditingController();
@@ -51,7 +48,7 @@ class _RegisterPageState extends State<RegisterPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-            const Text("CREATE ACCOUNT", style: TextStyle(fontSize: 30, fontWeight:FontWeight.bold, fontFamily: "Roboto-Bold", color: Color.fromARGB(255, 40, 75, 158)),),
+            const Text("CREATE ACCOUNT", style: TextStyle(fontSize: 30, fontWeight:FontWeight.bold, fontFamily: "Roboto-Bold", color: AppColors.primaryBlue),),
               const SizedBox(height: 20),
               Column(
                 children: [
@@ -83,8 +80,8 @@ class _RegisterPageState extends State<RegisterPage> {
   ElevatedButton RegisterRegisterButton() {
     return ElevatedButton(
       style: ElevatedButton.styleFrom(
-        backgroundColor: const Color.fromARGB(255, 40, 75, 158),
-        foregroundColor: Colors.white
+        backgroundColor: AppColors.primaryBlue,
+        foregroundColor: AppColors.bgLightBlue
       ),
       onPressed: () {
         if (_formKey.currentState!.validate()) {
@@ -113,10 +110,10 @@ class _RegisterPageState extends State<RegisterPage> {
             decoration: InputDecoration(
               labelText: 'e.g. IT Department',
               enabledBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: primaryBlue, width: 2),
+                borderSide: const BorderSide(color: AppColors.primaryBlue, width: 2),
                 borderRadius: BorderRadius.circular(20)),
               focusedBorder: OutlineInputBorder(
-                borderSide: BorderSide(color: primaryBlue, width: 2),
+                borderSide: const BorderSide(color: AppColors.primaryBlue, width: 2),
                 borderRadius: BorderRadius.circular(20)),
               errorBorder: OutlineInputBorder(
                 borderSide: const BorderSide(color: Colors.red, width: 2),
@@ -134,10 +131,10 @@ class _RegisterPageState extends State<RegisterPage> {
             decoration: InputDecoration(
               labelText: 'e.g. John (Given Name)',
               enabledBorder: OutlineInputBorder(
-                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                borderSide: const BorderSide(color: AppColors.primaryBlue, width: 2),
                 borderRadius: BorderRadius.circular(20)),
               focusedBorder: OutlineInputBorder(
-                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                borderSide: const BorderSide(color: AppColors.primaryBlue, width: 2),
                 borderRadius: BorderRadius.circular(20)),
               errorBorder: OutlineInputBorder(
                 borderSide: const BorderSide(color: Colors.red, width: 2),
@@ -155,10 +152,10 @@ class _RegisterPageState extends State<RegisterPage> {
             decoration: InputDecoration(
               labelText: 'e.g. Lim (Family Name)',
               enabledBorder: OutlineInputBorder(
-                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                borderSide: const BorderSide(color: AppColors.primaryBlue, width: 2),
                 borderRadius: BorderRadius.circular(20)),
               focusedBorder: OutlineInputBorder(
-                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                borderSide: const BorderSide(color: AppColors.primaryBlue, width: 2),
                 borderRadius: BorderRadius.circular(20)),
               errorBorder: OutlineInputBorder(
                 borderSide: const BorderSide(color: Colors.red, width: 2),
@@ -176,10 +173,10 @@ class _RegisterPageState extends State<RegisterPage> {
             decoration: InputDecoration(
               labelText: 'e.g. 0123456789',
               enabledBorder: OutlineInputBorder(
-                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                borderSide: const BorderSide(color: AppColors.primaryBlue, width: 2),
                 borderRadius: BorderRadius.circular(20)),
               focusedBorder: OutlineInputBorder(
-                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                borderSide: const BorderSide(color: AppColors.primaryBlue, width: 2),
                 borderRadius: BorderRadius.circular(20)),
               errorBorder: OutlineInputBorder(
                 borderSide: const BorderSide(color: Colors.red, width: 2),
@@ -197,10 +194,10 @@ class _RegisterPageState extends State<RegisterPage> {
             decoration: InputDecoration(
               labelText: 'e.g. example@mail.com',
               enabledBorder: OutlineInputBorder(
-                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                borderSide: const BorderSide(color: AppColors.primaryBlue, width: 2),
                 borderRadius: BorderRadius.circular(20)),
               focusedBorder: OutlineInputBorder(
-                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                borderSide: const BorderSide(color: AppColors.primaryBlue, width: 2),
                 borderRadius: BorderRadius.circular(20)),
               errorBorder: OutlineInputBorder(
                 borderSide: const BorderSide(color: Colors.red, width: 2),
@@ -225,10 +222,10 @@ class _RegisterPageState extends State<RegisterPage> {
                 onPressed: _togglePasswordVisibility,
               ),
               enabledBorder: OutlineInputBorder(
-                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                borderSide: const BorderSide(color: AppColors.primaryBlue, width: 2),
                 borderRadius: BorderRadius.circular(20)),
               focusedBorder: OutlineInputBorder(
-                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                borderSide: const BorderSide(color: AppColors.primaryBlue, width: 2),
                 borderRadius: BorderRadius.circular(20)),
               errorBorder: OutlineInputBorder(
                 borderSide: const BorderSide(color: Colors.red, width: 2),
@@ -247,10 +244,10 @@ class _RegisterPageState extends State<RegisterPage> {
             decoration: InputDecoration(
               labelText: 'Re-enter your password',
               enabledBorder: OutlineInputBorder(
-                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                borderSide: const BorderSide(color: AppColors.primaryBlue, width: 2),
                 borderRadius: BorderRadius.circular(20)),
               focusedBorder: OutlineInputBorder(
-                borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+                borderSide: const BorderSide(color: AppColors.primaryBlue, width: 2),
                 borderRadius: BorderRadius.circular(20)),
               errorBorder: OutlineInputBorder(
                 borderSide: const BorderSide(color: Colors.red, width: 2),

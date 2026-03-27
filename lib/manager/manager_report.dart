@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import 'package:worknest/services/pdf_service.dart';
 import 'package:rxdart/rxdart.dart';
+import 'package:worknest/utils/app_colors.dart';
 
 class ManagerReportPage extends StatefulWidget {
   final String deptCode;
@@ -14,8 +15,6 @@ class ManagerReportPage extends StatefulWidget {
 }
 
 class _ManagerReportPageState extends State<ManagerReportPage> {
-  final Color primaryBlue = const Color.fromARGB(255, 40, 75, 158);
-  final Color bgLightBlue = const Color.fromARGB(255, 240, 250, 255);
   int? _expandedIndex;
   String _selectedPeriod = "All";
 
@@ -86,8 +85,7 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
     for (var shift in schedules) {
       var shiftData = shift.data() as Map<String, dynamic>;
       
-      // Assumes identifier is workerName. Change to workerID if that's what your DB uses.
-      String workerName = shiftData['shiftUserName'] ?? ''; 
+      String employeeName = shiftData['shiftUserName'] ?? ''; 
       if (shiftData['shiftDate'] == null) continue;
       
       DateTime shiftDate = (shiftData['shiftDate'] as Timestamp).toDate();
@@ -97,16 +95,16 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
       // d. Compare with Leave
       bool hasLeave = leaves.any((leaveDoc) {
         var leaveData = leaveDoc.data() as Map<String, dynamic>;
-        if (leaveData['leaveUserName'] != workerName || leaveData['leaveDate'] == null) return false;
+        if (leaveData['leaveUserName'] != employeeName || leaveData['leaveDate'] == null) return false;
         return dateKeyFormat.format((leaveData['leaveDate'] as Timestamp).toDate()) == shiftDateString;
       });
 
-      if (hasLeave) continue; // Skip, worker is on leave
+      if (hasLeave) continue; // Skip, employee is on leave
 
       // e. Compare with Attendance
       bool hasValidAttendance = attendances.any((attDoc) {
         var attData = attDoc.data() as Map<String, dynamic>;
-        if (attData['attendanceUserName'] != workerName || attData['attendanceDate'] == null) return false;
+        if (attData['attendanceUserName'] != employeeName || attData['attendanceDate'] == null) return false;
         
         String attDateString = dateKeyFormat.format((attData['attendanceDate'] as Timestamp).toDate());
         
@@ -125,7 +123,7 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
         return false;
       });
 
-      if (hasValidAttendance) continue; // Skip, worker attended correctly
+      if (hasValidAttendance) continue; // Skip, employee attended correctly
 
       // f. If no leave and no valid attendance, it's an absent shift
       absentList.add(shiftData);
@@ -147,12 +145,12 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Manage Report"),
+        title: const Text("Attendance Report"),
         centerTitle: true,
-        backgroundColor: primaryBlue,
+        backgroundColor: AppColors.primaryBlue,
         foregroundColor: Colors.white,
       ),
-      backgroundColor: bgLightBlue,
+      backgroundColor: AppColors.bgLightBlue,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -218,8 +216,8 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
                               label: const Text("Export Attendance Report", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.white,
-                                foregroundColor: primaryBlue,
-                                side: BorderSide(width: 2, color: primaryBlue),
+                                foregroundColor: AppColors.primaryBlue,
+                                side: BorderSide(width: 2, color: AppColors.primaryBlue),
                                 padding: const EdgeInsets.all(15),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))
                               ),
@@ -256,7 +254,7 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
   // ADDED: UI Container for Absent List
   Widget _buildAbsentContainer(List<Map<String, dynamic>> absentShifts) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
+      margin: const EdgeInsets.symmetric(vertical: 5),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(15),
@@ -275,7 +273,7 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
               
               return ListTile(
                 leading: const Icon(Icons.warning, color: Colors.red),
-                title: Text(shift['shiftUserName'] ?? 'Unknown Worker', style: const TextStyle(fontWeight: FontWeight.bold)),
+                title: Text(shift['shiftUserName'] ?? 'Unknown Employee', style: const TextStyle(fontWeight: FontWeight.bold)),
                 subtitle: Text("Expected Shift: $formattedDate"),
                 trailing: const Text("Absent", style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
               );
@@ -287,7 +285,7 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
   // EXTRACTED: Original Attendance Container UI
   Widget _buildAttendanceContainer(List<QueryDocumentSnapshot> docs) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
+      margin: const EdgeInsets.symmetric(vertical: 5),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(15),
@@ -323,7 +321,7 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
           Expanded(flex: 3, child: Center(child: Text("Date", style: TextStyle(fontWeight: FontWeight.bold)))),
           Expanded(flex: 3, child: Center(child: Text("Employee", style: TextStyle(fontWeight: FontWeight.bold)))),
           Expanded(flex: 2, child: Center(child: Text("Status", style: TextStyle(fontWeight: FontWeight.bold)))),
-          Expanded(flex: 1, child: Center(child: Text(" ", style: TextStyle(fontWeight: FontWeight.bold)))),
+          Expanded(flex: 1, child: Center(child: Text("", style: TextStyle(fontWeight: FontWeight.bold)))),
         ],
       ),
     );
@@ -350,7 +348,7 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
     }
 
     String status = attendance['attendanceApproval']?.toString() ?? 'Pending';
-    String workerName = attendance['attendanceUserName']?.toString() ?? 'Unknown';
+    String employeeName = attendance['attendanceUserName']?.toString() ?? 'Unknown';
     String? approvalReason = attendance.containsKey('approvalReason') ? attendance['approvalReason'] : null;
     bool isExpanded = _expandedIndex == index;
 
@@ -377,9 +375,9 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
             Row(
               children: [
                 Expanded(flex: 3, child: Center(child: Text(formattedDate))),
-                Expanded(flex: 3, child: Center(child: Text(workerName))),
+                Expanded(flex: 3, child: Center(child: Text(employeeName))),
                 Expanded(
-                  flex: 3, 
+                  flex: 2, 
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -395,7 +393,11 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
                         status, 
                         style: TextStyle(
                           fontSize: 10,
-                          color: status == "Approved" ? Colors.green : Colors.grey,
+                          color: status == "Approved"
+                            ? Colors.green
+                            : status == "Pending"
+                                ? Colors.yellow
+                                : Colors.red,
                         ),
                       ),
                     ],
@@ -595,8 +597,8 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
             });
           },
           style: SegmentedButton.styleFrom(
-            selectedBackgroundColor: primaryBlue,
-            selectedForegroundColor: bgLightBlue,
+            selectedBackgroundColor: AppColors.primaryBlue,
+            selectedForegroundColor: AppColors.bgLightBlue,
             visualDensity: VisualDensity.comfortable,
             side: const BorderSide(width: 1, color: Colors.grey),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),

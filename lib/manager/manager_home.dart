@@ -2,11 +2,11 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:worknest/manager/manager_profile.dart';
 import 'package:worknest/manager/manager_report.dart';
 import 'package:worknest/manager/manager_schedule.dart';
 import 'package:worknest/services/auth_wrapper.dart';
+import 'package:worknest/utils/app_colors.dart';
 import 'manager_employee.dart';
 
 class ManagerHome extends StatefulWidget {
@@ -21,9 +21,6 @@ class _ManagerHomePageState extends State<ManagerHome> {
 
   // for navigation
   int _selectedIndex = 0;
-  // often use colors
-  final Color primaryBlue = const Color.fromARGB(255, 40, 75, 158);
-  final Color bgLightBlue = const Color.fromARGB(255, 240, 250, 255);
 
   final ScrollController _activityScrollController = ScrollController();
   String deptCode = "Loading...";
@@ -95,7 +92,7 @@ class _ManagerHomePageState extends State<ManagerHome> {
     ];
 
     return Scaffold(
-      backgroundColor: bgLightBlue,
+      backgroundColor: AppColors.bgLightBlue,
       // 2. Switches body based on the index
       body: pages[_selectedIndex],
 
@@ -145,7 +142,7 @@ class _ManagerHomePageState extends State<ManagerHome> {
                 Expanded(
                   flex: 1,
                   child: IconButton.outlined(
-                    icon: Icon(Icons.logout, color: primaryBlue),
+                    icon: Icon(Icons.logout, color: AppColors.primaryBlue),
                     onPressed: _showLogoutConfirmation
                   ),
                 ),
@@ -170,7 +167,7 @@ class _ManagerHomePageState extends State<ManagerHome> {
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
-                        color: primaryBlue,
+                        color: AppColors.primaryBlue,
                         letterSpacing: 5),
                     ),
                   ),
@@ -211,7 +208,7 @@ class _ManagerHomePageState extends State<ManagerHome> {
       decoration: BoxDecoration(
         color: color ?? Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: primaryBlue, width: 2),
+        border: Border.all(color: AppColors.primaryBlue, width: 2),
         boxShadow: const [
           BoxShadow(
             color: Colors.blueGrey,
@@ -229,7 +226,7 @@ class _ManagerHomePageState extends State<ManagerHome> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 15),
         decoration: BoxDecoration(
-          color: bgLightBlue,
+          color: AppColors.bgLightBlue,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: color.withOpacity(0.5), width: 5),
         ),
@@ -337,8 +334,8 @@ class _ManagerHomePageState extends State<ManagerHome> {
             });
           },
           style: SegmentedButton.styleFrom(
-            selectedBackgroundColor: primaryBlue,
-            selectedForegroundColor: bgLightBlue,
+            selectedBackgroundColor: AppColors.primaryBlue,
+            selectedForegroundColor: AppColors.bgLightBlue,
             // 4. Ensure visual density is tight
             visualDensity: VisualDensity.comfortable,
             side: const BorderSide(width: 1, color: Colors.grey),
@@ -436,7 +433,7 @@ class _ManagerHomePageState extends State<ManagerHome> {
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: Colors.grey[50],
-            border: Border.all(color: primaryBlue, width: 2),
+            border: Border.all(color: AppColors.primaryBlue, width: 2),
             borderRadius: BorderRadius.circular(15),
           ),
           child: Column(
@@ -529,11 +526,11 @@ class _ManagerHomePageState extends State<ManagerHome> {
       builder: (BuildContext context) {
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Row(
+          title: const Row(
             children: [
-              Icon(Icons.logout, color: primaryBlue),
-              const SizedBox(width: 10),
-              const Text("Confirm Logout"),
+              Icon(Icons.logout, color: AppColors.primaryBlue),
+              SizedBox(width: 10),
+              Text("Confirm Logout"),
             ],
           ),
           content: const Text("Are you sure you want to log out of WorkNest?"),

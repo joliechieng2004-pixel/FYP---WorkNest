@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:worknest/services/auth_service.dart';
+import 'package:worknest/utils/app_colors.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -10,8 +11,6 @@ class LoginPage extends StatefulWidget {
 
 class _LoginPageState extends State<LoginPage> {
   final AuthService _authService = AuthService();
-  
-  String _selectedRole = "employee";
 
   final TextEditingController _deptCodeController = TextEditingController(); // Only for Managers or joining
   final TextEditingController _emailController = TextEditingController();
@@ -37,7 +36,7 @@ class _LoginPageState extends State<LoginPage> {
               const SizedBox(height: 20),
               LoginLogo(),
               const SizedBox(height: 20),
-              const Text("LOGIN PAGE", style: TextStyle(fontSize: 30, fontWeight:FontWeight.bold, fontFamily: "Roboto-Bold", color: Color.fromARGB(255, 40, 75, 158)),),
+              const Text("LOGIN PAGE", style: TextStyle(fontSize: 30, fontWeight:FontWeight.bold, fontFamily: "Roboto-Bold", color: AppColors.primaryBlue),),
               const SizedBox(height: 20),
               LoginForm(),
               const SizedBox(height: 30),
@@ -65,7 +64,7 @@ class _LoginPageState extends State<LoginPage> {
   ElevatedButton LoginLoginButton() {
     return ElevatedButton(
       style: ElevatedButton.styleFrom(
-        backgroundColor: const Color.fromARGB(255, 40, 75, 158),
+        backgroundColor: AppColors.primaryBlue,
         foregroundColor: Colors.white
       ),
       onPressed: _handleLogin,
@@ -89,10 +88,10 @@ class _LoginPageState extends State<LoginPage> {
           decoration: InputDecoration(
             labelText: 'e.g. T001',
             enabledBorder: OutlineInputBorder(
-              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+              borderSide: const BorderSide(color: AppColors.primaryBlue, width: 2),
               borderRadius: BorderRadius.circular(20)),
             focusedBorder: OutlineInputBorder(
-              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+              borderSide: const BorderSide(color: AppColors.primaryBlue, width: 2),
               borderRadius: BorderRadius.circular(20)
               ),
           ),
@@ -104,10 +103,10 @@ class _LoginPageState extends State<LoginPage> {
           decoration: InputDecoration(
             labelText: 'e.g. example@mail.com',
             enabledBorder: OutlineInputBorder(
-              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+              borderSide: const BorderSide(color: AppColors.primaryBlue, width: 2),
               borderRadius: BorderRadius.circular(20)),
             focusedBorder: OutlineInputBorder(
-              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+              borderSide: const BorderSide(color: AppColors.primaryBlue, width: 2),
               borderRadius: BorderRadius.circular(20)
               ),
           ),
@@ -120,10 +119,10 @@ class _LoginPageState extends State<LoginPage> {
           decoration: InputDecoration(
             labelText: 'At least 8 characters',
             enabledBorder: OutlineInputBorder(
-              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+              borderSide: const BorderSide(color: AppColors.primaryBlue, width: 2),
               borderRadius: BorderRadius.circular(20)),
             focusedBorder: OutlineInputBorder(
-              borderSide: const BorderSide(color: Color.fromARGB(255, 40, 75, 158), width: 2),
+              borderSide: const BorderSide(color: AppColors.primaryBlue, width: 2),
               borderRadius: BorderRadius.circular(20)
               )
           ),

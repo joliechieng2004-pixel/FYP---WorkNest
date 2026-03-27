@@ -1,25 +1,22 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:worknest/services/attendance_count.dart';
 import 'package:worknest/services/pdf_service.dart';
 import 'package:rxdart/rxdart.dart';
+import 'package:worknest/utils/app_colors.dart';
 
 class EmployeeReport extends StatefulWidget {
   final String deptCode;
-  final String workerID;
+  final String employeeID;
 
-  const EmployeeReport({super.key, required this.deptCode, required this.workerID});
+  const EmployeeReport({super.key, required this.deptCode, required this.employeeID});
 
   @override
   State<EmployeeReport> createState() => _EmployeeReportPageState();
 }
 
 class _EmployeeReportPageState extends State<EmployeeReport> {
-  final Color primaryBlue = const Color.fromARGB(255, 40, 75, 158);
-  final Color bgLightBlue = const Color.fromARGB(255, 240, 250, 255);
-  
   final ScrollController _timesheetScrollController = ScrollController();
   final ScrollController _absentScrollController = ScrollController(); // Added for the new vertical list
 
@@ -33,7 +30,7 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
   @override
   void initState() {
     super.initState();
-    debugPrint(widget.workerID);
+    debugPrint(widget.employeeID);
     _initStreams(); 
   }
 
@@ -58,21 +55,21 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
     DateTime endDate = DateTime.now(); 
 
     var schedulesStream = FirebaseFirestore.instance.collection('shifts')
-        .where('shiftUserID', isEqualTo: widget.workerID) 
+        .where('shiftUserID', isEqualTo: widget.employeeID) 
         .where('shiftDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
         .where('shiftDate', isLessThanOrEqualTo: Timestamp.fromDate(endDate))
         .where('shiftStatus', isEqualTo: 'accepted')
         .snapshots();
 
     var leavesStream = FirebaseFirestore.instance.collection('leaves')
-        .where('leaveUserID', isEqualTo: widget.workerID) 
+        .where('leaveUserID', isEqualTo: widget.employeeID) 
         .where('leaveDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
         .where('leaveDate', isLessThanOrEqualTo: Timestamp.fromDate(endDate))
         .where('leaveStatus', isEqualTo: 'approved')
         .snapshots();
 
     var attendancesStream = FirebaseFirestore.instance.collection('attendances')
-        .where('attendanceUserID', isEqualTo: widget.workerID)
+        .where('attendanceUserID', isEqualTo: widget.employeeID)
         .where('attendanceDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate))
         .where('attendanceDate', isLessThanOrEqualTo: Timestamp.fromDate(endDate))
         .orderBy('attendanceDate', descending: true)
@@ -134,7 +131,7 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: bgLightBlue,
+      backgroundColor: AppColors.bgLightBlue,
       appBar: AppBar(
         title: const Text("Report"),
         centerTitle: true,
@@ -154,17 +151,38 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    const Text("My Overall Attendance", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    const Expanded(flex: 5, child: Text("My Overall Attendance", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
                     const SizedBox(width: 10),
-                    FutureBuilder<double>(
-                      future: AttendanceCount.getAttendanceRate(widget.workerID),
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState == ConnectionState.waiting) return CircularProgressIndicator();
-                        return Text("${snapshot.data?.toStringAsFixed(0)}%");
-                      },
+                    Expanded(
+                      child: FutureBuilder<double>(
+                        future: AttendanceCount.getAttendanceRate(widget.employeeID),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState == ConnectionState.waiting) return LinearProgressIndicator();
+                          return Text("${snapshot.data?.toStringAsFixed(0)}%");
+                        },
+                      ),
                     )
                   ],
                 )),
+
+              _buildCard(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    const Expanded(flex: 5, child: Text("My Total Absence", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FutureBuilder<int>(
+                        future: AttendanceCount.getAbsentCount(widget.employeeID),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState == ConnectionState.waiting) return LinearProgressIndicator();
+                          return Text("${snapshot.data?.toStringAsFixed(0)}%");
+                        },
+                      ),
+                    )
+                  ],
+                ),
+              ),
 
               const SizedBox(height: 10),
 
@@ -313,9 +331,9 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
                 icon: const Icon(Icons.picture_as_pdf),
                 label: const Text("Export My Report", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: bgLightBlue,
-                  foregroundColor: primaryBlue,
-                  side: BorderSide(width: 2, color: primaryBlue),
+                  backgroundColor: AppColors.bgLightBlue,
+                  foregroundColor: AppColors.primaryBlue,
+                  side: BorderSide(width: 2, color: AppColors.primaryBlue),
                   padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
                   minimumSize: const Size(double.infinity, 50), // Makes button full width
                 ),
@@ -352,7 +370,7 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
       decoration: BoxDecoration(
         color: color ?? Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: primaryBlue, width: 2),
+        border: Border.all(color: AppColors.primaryBlue, width: 2),
         boxShadow: const [
           BoxShadow(
             color: Colors.black12,
@@ -462,8 +480,8 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
             });
           },
           style: SegmentedButton.styleFrom(
-            selectedBackgroundColor: primaryBlue,
-            selectedForegroundColor: bgLightBlue,
+            selectedBackgroundColor: AppColors.primaryBlue,
+            selectedForegroundColor: AppColors.bgLightBlue,
             visualDensity: VisualDensity.comfortable,
             side: const BorderSide(width: 1, color: Colors.grey),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),

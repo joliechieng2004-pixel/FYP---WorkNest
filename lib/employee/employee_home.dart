@@ -13,6 +13,7 @@ import 'package:worknest/services/auth_wrapper.dart';
 import 'package:worknest/services/connectivity_service.dart';
 import 'package:worknest/services/location_service.dart';
 import 'package:worknest/widget/face_verification.dart';
+import 'package:worknest/utils/app_colors.dart';
 
 class EmployeeHome extends StatefulWidget {
   const EmployeeHome({super.key});
@@ -22,17 +23,15 @@ class EmployeeHome extends StatefulWidget {
 }
 
 class _EmployeeHomePageState extends State<EmployeeHome> {
-  // --- DECLARATION ---
-  // color
-  final Color primaryBlue = const Color.fromARGB(255, 40, 75, 158);
-  final Color bgLightBlue = const Color.fromARGB(255, 240, 250, 255);
-
   // navigation data
   int _selectedIndex = 0;
 
   // check connection
   late StreamSubscription<bool> _connectivitySubscription;
   bool _isOffline = false;
+
+  late Stream<QuerySnapshot> _pendingShiftStream;
+  late Stream<QuerySnapshot> _upcomingShiftStream;
 
   // timer
   bool _isClockedIn = false;
@@ -54,7 +53,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
   String deptName = "Loading...";
   String deptCode = "Loading...";
   String lName = "Name";
-  String workerID = "Worker ID";
+  String employeeID = "Employee ID";
   String formattedDate = DateFormat('EEEE, d MMM yyyy').format(DateTime.now());
   String formattedTime = DateFormat('h:mm a').format(DateTime.now());
 
@@ -75,7 +74,28 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
         ScaffoldMessenger.of(context).clearMaterialBanners();
       }
     });
+    _initStreams();
     _initializeData();
+  }
+
+  void _initStreams () {
+    DateTime now = DateTime.now();
+
+    _pendingShiftStream = FirebaseFirestore.instance
+        .collection('shifts')
+        .where('shiftUserID', isEqualTo: employeeID)
+        .where('shiftStatus', isEqualTo: 'pending') // Only count those needing action
+        .where('shiftDate', isGreaterThanOrEqualTo: Timestamp.fromDate(now))
+        .snapshots();
+    
+    _upcomingShiftStream = FirebaseFirestore.instance
+        .collection('shifts')
+        .where('shiftUserID', isEqualTo: employeeID)
+        .where('shiftDate', isGreaterThanOrEqualTo: Timestamp.fromDate(now))
+        .where('shiftStatus', isEqualTo: "accepted")
+        .orderBy('shiftDate')
+        .limit(7)
+        .snapshots();
   }
 
   void _showOfflineBanner() {
@@ -125,7 +145,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
           String fetchedDeptCode = userDoc['deptCode'];
 
           setState(() {
-            workerID = userDoc.id;
+            employeeID = userDoc.id;
             deptCode = fetchedDeptCode;
             lName = userDoc['userLName'];
           });
@@ -248,13 +268,13 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
       // pages
     final List<Widget> pages = [
       _buildHomeDashboard(context),                               // Index 0 - Home Page
-      EmployeeSchedule(deptCode: deptCode, workerID: workerID),   // Index 1 - Schedule Page
-      EmployeeReport(deptCode: deptCode, workerID: workerID),     // Index 2 - Report Page
-      EmployeeProfile(deptCode: deptCode, workerID: workerID),    // Index 3 - Profile Page
+      EmployeeSchedule(deptCode: deptCode, employeeID: employeeID),   // Index 1 - Schedule Page
+      EmployeeReport(deptCode: deptCode, employeeID: employeeID),     // Index 2 - Report Page
+      EmployeeProfile(deptCode: deptCode, employeeID: employeeID),    // Index 3 - Profile Page
     ];
 
     return Scaffold(
-      backgroundColor: bgLightBlue,
+      backgroundColor: AppColors.bgLightBlue,
       body: IndexedStack(
         index: _selectedIndex,
         children: pages,
@@ -300,14 +320,14 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
                 Expanded(
                   flex: 9,
                   child: Text(
-                    "$deptName: Worker", 
+                    "$deptName: Employee", 
                     textAlign: TextAlign.center,
                     style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
                 ),
                 Expanded(
                   flex: 1,
                   child: IconButton.outlined(
-                    icon: Icon(Icons.logout, color: primaryBlue),
+                    icon: const Icon(Icons.logout, color: AppColors.primaryBlue),
                     onPressed: _showLogoutConfirmation
                   ),
                 ),
@@ -333,7 +353,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
                       ),
                       onPressed: _isOffline ? null : _clockIn,
-                      child: Text(_isOffline ? "Waiting for Connection" : "Clock In", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                      child: Text(_isOffline ? "Waiting for Connection" : "Clock In", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                     )
                   ] else ...[
                     Row(
@@ -364,12 +384,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
 
             _buildCard(
               child: StreamBuilder<QuerySnapshot>(
-                stream: FirebaseFirestore.instance
-                    .collection('shifts')
-                    .where('shiftUserID', isEqualTo: workerID)
-                    .where('shiftStatus', isEqualTo: 'pending') // Only count those needing action
-                    .where('shiftDate', isGreaterThanOrEqualTo: Timestamp.fromDate(DateTime.now()))
-                    .snapshots(),
+                stream: _pendingShiftStream,
                 builder: (context, snapshot) {
                   // 1. Handle Loading State
                   if (snapshot.connectionState == ConnectionState.waiting) {
@@ -427,21 +442,14 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
                       fontWeight: FontWeight.bold),
                       textAlign: TextAlign.center),
 
-                  Divider(color: primaryBlue),
+                  const Divider(color: AppColors.primaryBlue),
 
                   const SizedBox(height: 10),
                   
                   SizedBox(
                     height: 300, // Set the height you want for the scrollable area
                     child: StreamBuilder<QuerySnapshot>(
-                      stream: FirebaseFirestore.instance
-                          .collection('shifts')
-                          .where('shiftUserID', isEqualTo: workerID)
-                          .where('shiftDate', isGreaterThanOrEqualTo: Timestamp.fromDate(DateTime.now()))
-                          .where('shiftStatus', isEqualTo: "accepted")
-                          .orderBy('shiftDate')
-                          .limit(7)
-                          .snapshots(),
+                      stream: _upcomingShiftStream,
                       builder: (context, snapshot) {
                         if (snapshot.hasError) {
                           debugPrint("Firestore Error: ${snapshot.error}");
@@ -469,7 +477,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
                             primary: false,
                             physics: const AlwaysScrollableScrollPhysics(),
                             itemCount: shifts.length,
-                            separatorBuilder: (context, index) => Divider(color: bgLightBlue,),
+                            separatorBuilder: (context, index) => const Divider(color: AppColors.bgLightBlue,),
                             itemBuilder: (context, index) {
                               var data = shifts[index].data() as Map<String, dynamic>;
                 
@@ -648,6 +656,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
       bool requireGPS = settings['requireGPS']!;
       bool requireFace = settings['requireFace']!;
 
+      // ignore: unused_local_variable
       GeoPoint currentGeoPoint;
 
       // Rule 3: Verify Location Again (IF NEEDED)
@@ -861,7 +870,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
       decoration: BoxDecoration(
         color: color ?? Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: primaryBlue, width: 2),
+        border: Border.all(color: AppColors.primaryBlue, width: 2),
         boxShadow: const [
           BoxShadow(
             color: Colors.blueGrey,
@@ -939,11 +948,11 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
       builder: (BuildContext context) {
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Row(
+          title: const Row(
             children: [
-              Icon(Icons.logout, color: primaryBlue),
-              const SizedBox(width: 10),
-              const Text("Confirm Logout"),
+              Icon(Icons.logout, color: AppColors.primaryBlue),
+              SizedBox(width: 10),
+              Text("Confirm Logout"),
             ],
           ),
           content: const Text("Are you sure you want to log out of WorkNest?"),

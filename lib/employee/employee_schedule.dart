@@ -3,25 +3,21 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:table_calendar/table_calendar.dart';
 import 'package:worknest/services/connectivity_service.dart';
+import 'package:worknest/utils/app_colors.dart';
 import 'package:worknest/widget/leaveitem.dart';
 
 class EmployeeSchedule extends StatefulWidget {
   final String deptCode;
-  final String workerID;
+  final String employeeID;
 
-  const EmployeeSchedule({super.key, required this.deptCode, required this.workerID});
+  const EmployeeSchedule({super.key, required this.deptCode, required this.employeeID});
 
   @override
   State<EmployeeSchedule> createState() => _EmployeeSchedulePageState();
 }
 
 class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
-  // often use colors
-  final Color primaryBlue = const Color.fromARGB(255, 40, 75, 158);
-  final Color bgLightBlue = const Color.fromARGB(255, 240, 250, 255);
-  
   final TextEditingController _leaveController = TextEditingController();
   final ScrollController _leaveScrollController = ScrollController();
   final ScrollController _shiftScrollController = ScrollController();
@@ -35,7 +31,9 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
   String formattedDate = DateFormat('EEEE, d MMM yyyy').format(DateTime.now());
   String formattedTime = DateFormat('h:mm a').format(DateTime.now());
   
-  Stream<QuerySnapshot>? _allShiftStream;
+  // ignore: unused_field
+  late Stream<QuerySnapshot> _allShiftStream;
+  late Stream<QuerySnapshot> _upcomingShiftStream;
 
   // --- INITIALIZATION ---
   @override
@@ -78,9 +76,17 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
     setState(() {
       _allShiftStream = FirebaseFirestore.instance
           .collection('shifts')
-          .where('shiftUserID', isEqualTo: widget.workerID)
+          .where('shiftUserID', isEqualTo: widget.employeeID)
           .where('shiftDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfToday))
           .orderBy('shiftDate', descending: false)
+          .snapshots();
+
+      _upcomingShiftStream = FirebaseFirestore.instance
+          .collection('shifts')
+          .where('shiftUserID', isEqualTo: widget.employeeID)
+          .where('shiftDate', isGreaterThanOrEqualTo: Timestamp.fromDate(
+              date.subtract(const Duration(hours: 1)))) // Current & Future
+          .orderBy('shiftDate', descending: false) 
           .snapshots();
     });
   }
@@ -98,7 +104,7 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: bgLightBlue,
+      backgroundColor: AppColors.bgLightBlue,
       appBar: AppBar(
         title: const Text("Manage Schedule"),
         centerTitle: true,
@@ -127,7 +133,7 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
                       label: "Pending Leave",
                       stream: FirebaseFirestore.instance
                           .collection('leaves')
-                          .where('leaveUserID', isEqualTo: widget.workerID)
+                          .where('leaveUserID', isEqualTo: widget.employeeID)
                           .where('leaveStatus', isEqualTo: 'pending')
                           .where('leaveDate', isGreaterThanOrEqualTo: Timestamp.fromDate(DateTime.now()))
                           .snapshots(),
@@ -138,7 +144,7 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
                       label: "Pending Shift",
                       stream: FirebaseFirestore.instance
                           .collection('shifts')
-                          .where('shiftUserID', isEqualTo: widget.workerID)
+                          .where('shiftUserID', isEqualTo: widget.employeeID)
                           .where('shiftStatus', isEqualTo: 'pending')
                           .where('shiftDate', isGreaterThanOrEqualTo: Timestamp.fromDate(DateTime.now()))
                           .snapshots(),
@@ -149,7 +155,7 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
                       label: "Upcoming Shift",
                       stream: FirebaseFirestore.instance
                           .collection('shifts')
-                          .where('shiftUserID', isEqualTo: widget.workerID)
+                          .where('shiftUserID', isEqualTo: widget.employeeID)
                           .where('shiftStatus', isEqualTo: 'accepted')
                           .where('shiftDate', isGreaterThanOrEqualTo: Timestamp.fromDate(DateTime.now()))
                           .snapshots(),
@@ -181,13 +187,7 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
                         thumbVisibility: true, 
                         child: StreamBuilder<QuerySnapshot>(
                           // Stream: Future shifts only, ordered by date (closest first)
-                          stream: FirebaseFirestore.instance
-                              .collection('shifts')
-                              .where('shiftUserID', isEqualTo: widget.workerID)
-                              .where('shiftDate', isGreaterThanOrEqualTo: Timestamp.fromDate(
-                                  DateTime.now().subtract(const Duration(hours: 1)))) // Current & Future
-                              .orderBy('shiftDate', descending: false) 
-                              .snapshots(),
+                          stream: _upcomingShiftStream,
                           builder: (context, snapshot) {
                             if (snapshot.hasError) {
                               print("Shift Stream Error: ${snapshot.error}");
@@ -254,11 +254,11 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
                         controller: _leaveScrollController,
                         thumbVisibility: true, 
                         child: StreamBuilder<QuerySnapshot>(
-                          // 1. Fetching leave requests specific to this worker
+                          // 1. Fetching leave requests specific to this employee
                           stream: FirebaseFirestore.instance
                               .collection('leaves')
-                              .where('leaveUserID', isEqualTo: widget.workerID) // Using widget.workerID from your class
-                              .orderBy('leaveDate', descending: true)  // Newest requests on top
+                              .where('leaveUserID', isEqualTo: widget.employeeID) // Using widget.employeeID from your class
+                              .orderBy('leaveDate', descending: false)  // Newest requests on top
                               .snapshots(),
                           builder: (context, snapshot) {
                             // 2. Handle Loading & Errors
@@ -328,7 +328,7 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
       decoration: BoxDecoration(
         color: color ?? Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: primaryBlue, width: 2),
+        border: Border.all(color: AppColors.primaryBlue, width: 2),
         boxShadow: const [
           BoxShadow(
             color: Colors.blueGrey,
@@ -435,7 +435,7 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: primaryBlue, width: 2),
+        border: Border.all(color: AppColors.primaryBlue, width: 2),
         boxShadow: const [
           BoxShadow(
             color: Colors.blueGrey,
@@ -467,7 +467,7 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
               label: Text(_isOffline ? "Waiting for Connection" : "Select Date & Request Leave"),
               style: ElevatedButton.styleFrom(
                 minimumSize: const Size(double.infinity, 45),
-                backgroundColor: _isOffline ? Colors.grey : primaryBlue,
+                backgroundColor: _isOffline ? Colors.grey : AppColors.primaryBlue,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
@@ -489,7 +489,7 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
         return Theme(
           data: Theme.of(context).copyWith(
             colorScheme: ColorScheme.light(
-              primary: primaryBlue, // header background color
+              primary: AppColors.primaryBlue, // header background color
               onPrimary: Colors.white, // header text color
               onSurface: Colors.black, // body text color
             ),
@@ -519,7 +519,7 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
         builder: (context, setDialogState) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Text("Request for a Leave", 
-            style: TextStyle(color: primaryBlue, fontSize: 18, fontWeight: FontWeight.bold)),
+            style: TextStyle(color: AppColors.primaryBlue, fontSize: 18, fontWeight: FontWeight.bold)),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -557,13 +557,13 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
                 return;
               }
                 try {
-                  // 1. Fetch workerName from users collection
+                  // 1. Fetch employeeName from users collection
                   DocumentSnapshot userDoc = await FirebaseFirestore.instance
                       .collection('users')
-                      .doc(widget.workerID)
+                      .doc(widget.employeeID)
                       .get();
 
-                  debugPrint(widget.workerID);
+                  debugPrint(widget.employeeID);
 
                   Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
                   String fullName = "${userData['userFName']} ${userData['userLName']}";
@@ -571,8 +571,8 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
                   // 2. Submit with all fields
                   await _submitLeaveToFirestore(
                     deptCode: widget.deptCode,
-                    workerID: widget.workerID,
-                    workerName: fullName,
+                    employeeID: widget.employeeID,
+                    employeeName: fullName,
                     leaveReason: _leaveController.text,
                     leaveDate: selectedLeaveDate,
                   );
@@ -593,7 +593,7 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
                   print("Error submitting leave: $e");
                 }
               },
-              style: ElevatedButton.styleFrom(backgroundColor: primaryBlue, foregroundColor: Colors.white),
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryBlue, foregroundColor: Colors.white),
               child: const Text("Confirm"),
             ),
           ],
@@ -605,14 +605,14 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
   // Feature - Submit Leave
   Future<void> _submitLeaveToFirestore({
     required String deptCode,
-    required String workerID,
-    required String workerName,
+    required String employeeID,
+    required String employeeName,
     required String leaveReason,
     required DateTime leaveDate,
   }) async {
-    // 1. Create a unique document ID (e.g., "2026-03-19_worker123")
+    // 1. Create a unique document ID (e.g., "2026-03-19_employee123")
     String dateString = DateFormat('yyyy-MM-dd').format(leaveDate);
-    String customDocId = "${dateString}_$workerID";
+    String customDocId = "${dateString}_$employeeID";
 
     try {
       // 2. Use .doc(customDocId).set() instead of .add()
@@ -621,8 +621,8 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
           .doc(customDocId) 
           .set({
         'deptCode': deptCode,
-        'leaveUserID': workerID,
-        'leaveUserName': workerName,
+        'leaveUserID': employeeID,
+        'leaveUserName': employeeName,
         'leaveDate': Timestamp.fromDate(leaveDate),
         'leaveReason': leaveReason,
         'leaveStatus': 'pending',
@@ -740,7 +740,7 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
                   color: (label.contains("Pending") && value != "0") 
                       ? Colors.red.shade50 
                       : Colors.transparent,
-                  border: Border.all(color: primaryBlue.withOpacity(0.5)),
+                  border: Border.all(color: AppColors.primaryBlue.withOpacity(0.5)),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -749,7 +749,7 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
                   style: TextStyle(
                     color: (label.contains("Pending") && value != "0") 
                         ? Colors.red 
-                        : primaryBlue,
+                        : AppColors.primaryBlue,
                     fontWeight: FontWeight.bold,
                   ),
                 ),

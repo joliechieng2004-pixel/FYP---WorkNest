@@ -131,7 +131,7 @@ class _ExpandableLeaveItemState extends State<ExpandableLeaveItem> {
                   
                   const Divider(),
                   
-                  // --- MANAGER'S NOTE VIEW (Visible to Workers if it exists) ---
+                  // --- MANAGER'S NOTE VIEW (Visible to Employees if it exists) ---
                   if (!widget.isManager && widget.managerNote != null) ...[
                     const Divider(height: 30),
                     const Text("Manager's Note:", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
