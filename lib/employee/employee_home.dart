@@ -74,7 +74,6 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
         ScaffoldMessenger.of(context).clearMaterialBanners();
       }
     });
-    _initStreams();
     _initializeData();
   }
 
@@ -148,6 +147,8 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
             employeeID = userDoc.id;
             deptCode = fetchedDeptCode;
             lName = userDoc['userLName'];
+
+            _initStreams();
           });
 
           await _fetchOfficeCoordinates(fetchedDeptCode);
@@ -382,13 +383,14 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
               ),
             ),
 
+            // Pending Shift Count
             _buildCard(
               child: StreamBuilder<QuerySnapshot>(
                 stream: _pendingShiftStream,
                 builder: (context, snapshot) {
                   // 1. Handle Loading State
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: LinearProgressIndicator());
+                  if (snapshot.connectionState == ConnectionState.waiting || !snapshot.hasData) {
+                    return const Center(child: Text("Loading Shifts..."));
                   }
 
                   // 2. Get the Count

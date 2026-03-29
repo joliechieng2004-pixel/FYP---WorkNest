@@ -63,7 +63,7 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
     _selectedDay = DateTime.now(); // Default selection to today
     initStreams();
     // Debug Check
-    // _debugCheckDatabase();
+    _debugCheckDatabase();
   }
 
   void _showOfflineBanner() {
@@ -113,29 +113,29 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
   }
 
   // DEBUG PURPOSE
-  // void _debugCheckDatabase() async {
-  //   print("--- DATABASE INSPECTION START ---");
-  //   var snapshot = await FirebaseFirestore.instance
-  //       .collection('shifts')
-  //       .where('deptCode', isEqualTo: widget.deptCode)
-  //       .get();
+  void _debugCheckDatabase() async {
+    print("--- DATABASE INSPECTION START ---");
+    var snapshot = await FirebaseFirestore.instance
+        .collection('shifts')
+        .where('deptCode', isEqualTo: widget.deptCode)
+        .get();
 
-  //   if (snapshot.docs.isEmpty) {
-  //     print("Zero shifts found even WITHOUT date filtering. Check your deptCode!");
-  //   }
+    if (snapshot.docs.isEmpty) {
+      print("Zero shifts found even WITHOUT date filtering. Check your deptCode!");
+    }
 
-  //   for (var doc in snapshot.docs) {
-  //     var data = doc.data();
-  //     var dateField = data['shiftDate'];
+    for (var doc in snapshot.docs) {
+      var data = doc.data();
+      var dateField = data['shiftDate'];
       
-  //     if (dateField is Timestamp) {
-  //       print("Doc ID: ${doc.id} | Date: ${dateField.toDate()} | Type: Timestamp");
-  //     } else {
-  //       print("Doc ID: ${doc.id} | Date: $dateField | Type: ${dateField.runtimeType} (ERROR: Should be Timestamp)");
-  //     }
-  //   }
-  //   print("--- DATABASE INSPECTION END ---");
-  // }
+      if (dateField is Timestamp) {
+        print("Doc ID: ${doc.id} | Date: ${dateField.toDate()} | Type: Timestamp");
+      } else {
+        print("Doc ID: ${doc.id} | Date: $dateField | Type: ${dateField.runtimeType} (ERROR: Should be Timestamp)");
+      }
+    }
+    print("--- DATABASE INSPECTION END ---");
+  }
 
   @override
   void dispose() {
@@ -189,21 +189,8 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
                       _focusedDay = focusedDay; // update focusedDay as well
                       _isDateSelected = true;
 
-                      // RE-INITIALIZE the shift stream for the new date!
-                      _shiftStream = FirebaseFirestore.instance
-                              .collection('shifts')
-                              .where('deptCode', isEqualTo: widget.deptCode)
-                              .where('shiftDate', isGreaterThanOrEqualTo: Timestamp.fromDate(_selectedDay!))
-                              .where('shiftDate', isLessThanOrEqualTo: Timestamp.fromDate(_selectedDay!))
-                              .snapshots();
-                      _leaveStream = FirebaseFirestore.instance
-                              .collection('leaves')
-                              .where('leaveStatus', isEqualTo: 'approved')
-                              .where('leaveDate', isGreaterThanOrEqualTo: Timestamp.fromDate(_selectedDay!))
-                              .where('leaveDate', isLessThanOrEqualTo: Timestamp.fromDate(_selectedDay!))
-                              .snapshots();
+                      _updateStreams(selectedDay);
                     });
-                    // TODO: Fetch shifts from Firestore for this specific date!
                     print("Selected Date: $_selectedDay");
                   },
                   onFormatChanged: (format) {
@@ -396,6 +383,7 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
                                 var data = doc.data() as Map<String, dynamic>;
                                 
                                 // Extract and format data
+                                String employeeID = data['leaveUserID'] ?? "Unknown";
                                 String employeeName = data['leaveUserName'] ?? "Unknown";
                                 String status = data['leaveStatus'] ?? "pending";
                                 String reason = data['leaveReason'] ?? "No reason provided";
@@ -405,6 +393,8 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
                                 return ExpandableLeaveItem(
                                   docId: doc.id,
                                   title: formattedDate,
+                                  leaveDate: date,
+                                  id: employeeID,
                                   name: employeeName,
                                   reason: reason,
                                   status: status,
@@ -772,5 +762,35 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
         ],
       ),
     );
+  }
+
+  // 1. Create a helper function to avoid code duplication
+  void _updateStreams(DateTime date) {
+    // Force the range to cover the FULL day
+    DateTime start = DateTime(date.year, date.month, date.day, 0, 0, 0);
+    DateTime end = DateTime(date.year, date.month, date.day, 23, 59, 59, 999);
+
+    setState(() {
+      _shiftStream = FirebaseFirestore.instance
+          .collection('shifts')
+          .where('deptCode', isEqualTo: widget.deptCode)
+          .where('shiftDate', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
+          .where('shiftDate', isLessThanOrEqualTo: Timestamp.fromDate(end))
+          .snapshots();
+
+      _leaveStream = FirebaseFirestore.instance
+          .collection('leaves')
+          .where('deptCode', isEqualTo: widget.deptCode) // Filter by dept too!
+          .where('leaveStatus', isEqualTo: 'approved')
+          .where('leaveDate', isGreaterThanOrEqualTo: Timestamp.fromDate(start))
+          .where('leaveDate', isLessThanOrEqualTo: Timestamp.fromDate(end))
+          .snapshots();
+
+      _userStream = FirebaseFirestore.instance
+            .collection('users')
+            .where('deptCode', isEqualTo: widget.deptCode)
+            .where('userRole', isEqualTo: 'employee')
+            .snapshots();
+    });
   }
 }

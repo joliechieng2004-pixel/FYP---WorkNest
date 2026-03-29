@@ -3,15 +3,20 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class AttendanceCount {
   /// Private helper to avoid repeating Firebase code
   static Future<Map<String, int>> _getRawCounts(String employeeID) async {
+    Timestamp now = Timestamp.now();
+
     final scheduledQuery = await FirebaseFirestore.instance
         .collection('shifts')
         .where('shiftUserID', isEqualTo: employeeID)
+        .where('shiftStatus', isEqualTo: 'accepted')
+        .where('shiftDate', isLessThanOrEqualTo: now)
         .count()
         .get();
 
     final attendedQuery = await FirebaseFirestore.instance
         .collection('attendances')
         .where('attendanceUserID', isEqualTo: employeeID)
+        .where('attendanceStartTime', isLessThanOrEqualTo: now)
         .count()
         .get();
 
@@ -47,6 +52,9 @@ class AttendanceCount {
     
     double rate = scheduled == 0 ? 0.0 : (attended / scheduled) * 100;
     int absent = (scheduled - attended) < 0 ? 0 : (scheduled - attended);
+
+    // If they attended more than scheduled (early clock-in), just show 100%
+    if (attended > scheduled) rate = 100.0;
 
     return {
       'rate': rate,

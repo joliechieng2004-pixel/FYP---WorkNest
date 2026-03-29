@@ -73,7 +73,7 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
     );
   }
 
-  // 4. ADDED: The core comparison logic
+  // Core comparison logic
   List<Map<String, dynamic>> _calculateAbsences(
     List<QueryDocumentSnapshot> schedules,
     List<QueryDocumentSnapshot> leaves,
@@ -84,48 +84,46 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
 
     for (var shift in schedules) {
       var shiftData = shift.data() as Map<String, dynamic>;
-      
-      String employeeName = shiftData['shiftUserName'] ?? ''; 
       if (shiftData['shiftDate'] == null) continue;
-      
+
       DateTime shiftDate = (shiftData['shiftDate'] as Timestamp).toDate();
       String shiftDateString = dateKeyFormat.format(shiftDate);
-      DateTime? shiftEndTime = shiftData['shiftEndTime'] != null ? (shiftData['shiftEndTime'] as Timestamp).toDate() : null;
+      String shiftUserId = shiftData['shiftUserID'] ?? ''; 
 
-      // d. Compare with Leave
+      // --- SHIFT LOGIC ---
+      // Eliminate future shifts
+      if (shiftDate.isAfter(DateTime.now())) continue;
+
+      // Eliminate ongoing shifts
+      DateTime? shiftEndTime = shiftData['shiftEndTime'] != null ? (shiftData['shiftEndTime'] as Timestamp).toDate() : null;
+      if (shiftEndTime != null && shiftEndTime.isAfter(DateTime.now())) continue;
+
+      // --- LEAVE LOGIC ---
+      // Eliminate shift with approved leave
       bool hasLeave = leaves.any((leaveDoc) {
         var leaveData = leaveDoc.data() as Map<String, dynamic>;
-        if (leaveData['leaveUserName'] != employeeName || leaveData['leaveDate'] == null) return false;
+        
+        if (leaveData['leaveUserID'] != shiftUserId || leaveData['leaveDate'] == null) return false;
+        
         return dateKeyFormat.format((leaveData['leaveDate'] as Timestamp).toDate()) == shiftDateString;
       });
 
-      if (hasLeave) continue; // Skip, employee is on leave
+      if (hasLeave) continue;
 
-      // e. Compare with Attendance
-      bool hasValidAttendance = attendances.any((attDoc) {
+      // --- ATTENDANCE LOGIC ---
+      // Eliminate shifts with ANY attendance
+      bool hasAnyAttendance = attendances.any((attDoc) {
         var attData = attDoc.data() as Map<String, dynamic>;
-        if (attData['attendanceUserName'] != employeeName || attData['attendanceDate'] == null) return false;
+        
+        if (attData['attendanceUserID'] != shiftUserId || attData['attendanceDate'] == null) return false;
         
         String attDateString = dateKeyFormat.format((attData['attendanceDate'] as Timestamp).toDate());
-        
-        if (attDateString == shiftDateString) {
-          bool isOnTime = attData['attendanceStatus'] == 'On-Time';
-          DateTime? attEndTime = attData['attendanceEndTime'] != null ? (attData['attendanceEndTime'] as Timestamp).toDate() : null;
-          
-          bool endTimeValid = false;
-          if (attEndTime != null && shiftEndTime != null) {
-            // attendanceEndTime later or equal to shiftEndTime
-            endTimeValid = attEndTime.isAfter(shiftEndTime) || attEndTime.isAtSameMomentAs(shiftEndTime);
-          }
-
-          if (isOnTime && endTimeValid) return true;
-        }
-        return false;
+        return attDateString == shiftDateString; 
       });
 
-      if (hasValidAttendance) continue; // Skip, employee attended correctly
+      if (hasAnyAttendance) continue;
 
-      // f. If no leave and no valid attendance, it's an absent shift
+      // Others are counted as absences
       absentList.add(shiftData);
     }
 

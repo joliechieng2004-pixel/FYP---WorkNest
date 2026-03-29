@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:worknest/services/auth_service.dart';
 import 'package:worknest/services/auth_wrapper.dart';
 import 'package:worknest/services/connectivity_service.dart';
 import 'package:worknest/utils/app_colors.dart';
@@ -23,6 +24,7 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
   final TextEditingController _profileEmailController = TextEditingController();
   final TextEditingController _profileContactController = TextEditingController();
 
+  final AuthService _authService = AuthService(); // Initialize Service
   final TextEditingController _newPasswordController = TextEditingController();
   final TextEditingController _confirmPasswordController = TextEditingController();
 
@@ -673,19 +675,20 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
   Future<void> _validateAndUpdatePassword() async {
     String newPass = _newPasswordController.text.trim();
     String confirmPass = _confirmPasswordController.text.trim();
+    String? passwordError = _authService.validatePassword(newPass);
 
     if (newPass.isEmpty || confirmPass.isEmpty) {
       _showSnackBar("Please fill in both fields", Colors.orange);
       return;
     }
 
-    if (newPass.length < 6) {
-      _showSnackBar("Password must be at least 6 characters", Colors.orange);
+    if (newPass != confirmPass) {
+      _showSnackBar("Passwords do not match", Colors.red);
       return;
     }
 
-    if (newPass != confirmPass) {
-      _showSnackBar("Passwords do not match", Colors.red);
+    if (passwordError != null) {
+      _showSnackBar(passwordError, Colors.red);
       return;
     }
 

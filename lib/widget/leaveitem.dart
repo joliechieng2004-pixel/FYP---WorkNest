@@ -7,6 +7,8 @@ import 'package:worknest/services/connectivity_service.dart';
 class ExpandableLeaveItem extends StatefulWidget {
   final String docId;
   final String title;
+  final DateTime leaveDate;
+  final String id;
   final String name;
   final String reason;
   final String status;
@@ -17,6 +19,8 @@ class ExpandableLeaveItem extends StatefulWidget {
     super.key, 
     required this.docId,
     required this.title, 
+    required this.leaveDate,
+    required this.id,
     required this.name,
     required this.reason, 
     required this.status,
@@ -190,15 +194,64 @@ class _ExpandableLeaveItemState extends State<ExpandableLeaveItem> {
 
     try {
       // 2. Update Firestore
-      await FirebaseFirestore.instance
-          .collection('leaves')
-          .doc(widget.docId) // Use the unique ID from the stream
-          .update({
+      WriteBatch batch = FirebaseFirestore.instance.batch();
+
+      // 1. Update the Leave Request
+      DocumentReference leaveRef = FirebaseFirestore.instance.collection('leaves').doc(widget.docId);
+      batch.update(leaveRef, {
         'leaveStatus': newStatus,
-        'managerReason': comment.isEmpty ? null : comment, // Save comment if provided
-        'actionedAt': FieldValue.serverTimestamp(), // Optional: track when it was handled
+        'managerReason': comment.isEmpty ? null : comment,
+        'actionedAt': FieldValue.serverTimestamp(),
       });
 
+      if (isAccepted) {
+        // 1. Calculate the start and end of the leave day
+        DateTime startOfDay = DateTime(widget.leaveDate.year, widget.leaveDate.month, widget.leaveDate.day, 0, 0, 0);
+        DateTime endOfDay = DateTime(widget.leaveDate.year, widget.leaveDate.month, widget.leaveDate.day, 23, 59, 59);
+        String employee = widget.name;
+
+        var shiftConflictQuery = await FirebaseFirestore.instance
+            .collection('shifts')
+            .where('shiftUserID', isEqualTo: widget.id)
+            .where('shiftStatus', isEqualTo: 'accepted')
+            .where('shiftDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+            .where('shiftDate', isLessThanOrEqualTo: Timestamp.fromDate(endOfDay))
+            .get();
+
+        // 2. If conflict exists, show a confirmation dialog
+        if (shiftConflictQuery.docs.isNotEmpty) {
+          bool? proceed = await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text("Shift Conflict Detected"),
+              content: Text(
+                  "$employee have already accepted a shift for this day. Do you want to proceed?"),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("No")),
+                TextButton(onPressed: () => Navigator.pop(context, true), child: const Text("Yes, Proceed")),
+              ],
+            ),
+          );
+
+          if (proceed != true) return; // Stop execution if they click No
+        }
+
+        // 2. Query for shifts within that time range
+        var shiftQuery = await FirebaseFirestore.instance
+            .collection('shifts')
+            .where('shiftUserID', isEqualTo: widget.id)
+            .where('shiftDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+            .where('shiftDate', isLessThanOrEqualTo: Timestamp.fromDate(endOfDay))
+            .get();
+
+        for (var doc in shiftQuery.docs) {
+          //Change status to 'on-leave' so it shows up in your UI
+          batch.update(doc.reference, {'shiftStatus': 'on-leave'});
+        }
+      }
+
+      await batch.commit();
+      
       // 3. UI Feedback
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

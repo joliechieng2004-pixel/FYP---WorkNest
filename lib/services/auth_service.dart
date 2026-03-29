@@ -129,6 +129,12 @@ class AuthService {
     required String password,
     required String managerDeptCode,
   }) async {
+    // This ensures every new employee starts with a secure account
+    String? passwordError = validatePassword(password);
+    if (passwordError != null) {
+      return passwordError; // Return the specific "Must be 8+ chars..." error
+    }
+    
     // Create a temporary secondary app to avoid logging out the Manager
     FirebaseApp secondaryApp = await Firebase.initializeApp(
       name: 'TemporaryUserCreation',

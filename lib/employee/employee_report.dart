@@ -88,12 +88,14 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
     );
   }
 
+  // --- Employee View Absence Logic ---
   List<Map<String, dynamic>> _calculateAbsences(
     List<QueryDocumentSnapshot> schedules,
     List<QueryDocumentSnapshot> leaves,
     List<QueryDocumentSnapshot> attendances,
   ) {
     List<Map<String, dynamic>> absences = [];
+    DateFormat dateKeyFormat = DateFormat('yyyyMMdd');
     
     for (var shift in schedules) {
       var shiftData = shift.data() as Map<String, dynamic>;
@@ -101,27 +103,35 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
 
       DateTime shiftDate = (shiftData['shiftDate'] as Timestamp).toDate();
       
+      // Eliminate future shifts
       if (shiftDate.isAfter(DateTime.now())) continue;
 
+      // Eliminate ongoing shifts
+      DateTime? shiftEndTime = shiftData['shiftEndTime'] != null ? (shiftData['shiftEndTime'] as Timestamp).toDate() : null;
+      if (shiftEndTime != null && shiftEndTime.isAfter(DateTime.now())) continue;
+
+      // Eliminate shift with ANY attendance
       bool hasAttendance = attendances.any((att) {
         var attData = att.data() as Map<String, dynamic>;
         DateTime? attDate = _safeDate(attData['attendanceDate']);
         if (attDate == null) return false;
-        return DateFormat('yyyyMMdd').format(shiftDate) == DateFormat('yyyyMMdd').format(attDate);
+        return dateKeyFormat.format(shiftDate) == dateKeyFormat.format(attDate);
       });
 
       if (hasAttendance) continue;
 
+      // Eliminate shift with leave
       bool hasLeave = leaves.any((leave) {
         var leaveData = leave.data() as Map<String, dynamic>;
         DateTime? leaveDate = _safeDate(leaveData['leaveDate']);
         if (leaveDate == null) return false;
-        return DateFormat('yyyyMMdd').format(shiftDate) == DateFormat('yyyyMMdd').format(leaveDate) &&
-               leaveData['leaveStatus'] == 'Approved'; 
+        
+        return dateKeyFormat.format(shiftDate) == dateKeyFormat.format(leaveDate); 
       });
 
       if (hasLeave) continue;
 
+      //Others all are absence
       absences.add(shiftData);
     }
     return absences;

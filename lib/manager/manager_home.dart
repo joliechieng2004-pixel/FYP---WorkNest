@@ -27,7 +27,7 @@ class _ManagerHomePageState extends State<ManagerHome> {
   String deptName = "Loading...";
   String lName = "Name";
 
-  String _selectedPeriod = "Weekly";
+  String _selectedPeriod = "All";
 
   // --- INITIALIZATION ---
   @override
@@ -315,6 +315,10 @@ class _ManagerHomePageState extends State<ManagerHome> {
           showSelectedIcon: false, 
           segments: const [
             ButtonSegment(
+              value: "All", 
+              label: Center(child: Text("All")),
+            ),
+            ButtonSegment(
               value: "Weekly", 
               label: Center(child: Text("Week")), // 3. Wrap label in Center
             ),
@@ -349,6 +353,8 @@ class _ManagerHomePageState extends State<ManagerHome> {
   DateTime _getStartTime(String period) {
     DateTime now = DateTime.now();
     switch (period) {
+      case "All":
+        return DateTime(2000, 1, 1);
       case "Weekly":
         // Gets the start of the current week (Monday)
         DateTime startOfWeek = now.subtract(Duration(days: now.weekday - 1))
