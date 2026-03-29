@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -178,6 +180,7 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
           Expanded(flex: 3, child: Center(child: Text("Name", style: TextStyle(fontWeight: FontWeight.bold)))),
           Expanded(flex: 3, child: Center(child: Text("Enroll Date", style: TextStyle(fontWeight: FontWeight.bold)))),
           Expanded(flex: 3, child: Center(child: Text("Attendance", style: TextStyle(fontWeight: FontWeight.bold)))),
+          Expanded(flex: 1, child: Center(child: Text(" "),),),
         ],
       ),
     );
@@ -191,7 +194,7 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
     String fName = employee['userFName' ] ?? 'Unknown';
     String lName = employee['userLName' ] ?? 'Unknown';
     DateTime? addDate = _safeDate(employee['createdAt']);
-    String formattedDate = addDate != null ? DateFormat('dd MMM').format(addDate) : "--";
+    String formattedDate = addDate != null ? DateFormat('dd MMM yyyy').format(addDate) : "--";
     String employeeID = doc.id;
 
     return GestureDetector(
@@ -221,8 +224,17 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
                   child: FutureBuilder<double>(
                     future: AttendanceCount.getAttendanceRate(employeeID),
                     builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) return CircularProgressIndicator();
-                      return Text("${snapshot.data?.toStringAsFixed(0)}%");
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const SizedBox(
+                          height: 12, 
+                          width: 12, 
+                          child: CircularProgressIndicator(strokeWidth: 2)
+                        );
+                      }
+                      
+                      // Use a default value of 0.0 if data is null
+                      double rate = snapshot.data ?? 0.0;
+                      return Text("${rate.toStringAsFixed(0)}%");
                     },
                   )
                 )),
@@ -238,7 +250,7 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
                 children: [
                   _actionButton("View Profile", Colors.white, () {
                     _openEmployeeProfile(employee, employeeID);
-                    print("Viewing profile of $fName $lName");
+                    debugPrint("Viewing profile of $fName $lName");
                   }),
                   _actionButton("Remove Employee", Colors.white, () {
                     _showRemoveConfirmation(doc.id);}, isDelete: true),
@@ -284,10 +296,10 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
               },
               decoration: InputDecoration(
                 hintText: "Search name...",
-                prefixIcon: Icon(Icons.search, size: 20, color: AppColors.primaryBlue),
+                prefixIcon: const Icon(Icons.search, size: 20, color: AppColors.primaryBlue),
                 suffixIcon: _searchQuery.isNotEmpty 
                   ? IconButton(
-                      icon: Icon(Icons.clear, size: 20, color: AppColors.primaryBlue),
+                      icon: const Icon(Icons.clear, size: 20, color: AppColors.primaryBlue),
                       onPressed: () {
                         _searchController.clear();
                         setState(() { _searchQuery = ""; });
@@ -299,7 +311,7 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
                 fillColor: Colors.white,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(20),
-                  borderSide: BorderSide(color: AppColors.primaryBlue, width: 2.0)
+                  borderSide: const BorderSide(color: AppColors.primaryBlue, width: 2.0)
                 ),
               ),
             ),
@@ -310,7 +322,7 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.white,
             foregroundColor: AppColors.primaryBlue,
-            side: BorderSide(color: AppColors.primaryBlue),
+            side: const BorderSide(color: AppColors.primaryBlue),
             padding: const EdgeInsets.symmetric(horizontal: 20),
           ),
           icon: _isOffline ? const Icon(Icons.signal_wifi_connected_no_internet_4) : const Icon(Icons.add, size: 18),
@@ -325,7 +337,7 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text("Confirm Clock Out", style: TextStyle(fontWeight:FontWeight(5)),),
+          title: const Text("Confirm Remove Employee", style: TextStyle(fontWeight:FontWeight(5)),),
           content: const Text("Are you sure you want to remove the employee?"),
           actions: [
             TextButton(

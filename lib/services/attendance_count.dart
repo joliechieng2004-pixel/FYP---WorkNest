@@ -29,32 +29,34 @@ class AttendanceCount {
   /// Returns the percentage of shifts attended: 
   /// (Attended / Scheduled) * 100
   static Future<double> getAttendanceRate(String employeeID) async {
-    final stats = await _getRawCounts(employeeID);
-    if (stats['scheduled'] == 0) return 0.0;
-    
-    return (stats['attended']! / stats['scheduled']!) * 100;
+    final stats = await getFullAttendanceStats(employeeID);
+    return stats['rate'];
   }
 
   /// Returns the total number of missed shifts:
   /// (Scheduled - Attended)
   static Future<int> getAbsentCount(String employeeID) async {
-    final stats = await _getRawCounts(employeeID);
-    int absent = stats['scheduled']! - stats['attended']!;
-    return absent < 0 ? 0 : absent;
+    final stats = await getFullAttendanceStats(employeeID);
+    return stats['absent'];
   }
 
-  /// PRO-TIP: Returns both values in one go. 
-  /// Use this for your Pop-up to save on Firebase performance!
+  /// Returns both values in one go. 
   static Future<Map<String, dynamic>> getFullAttendanceStats(String employeeID) async {
     final stats = await _getRawCounts(employeeID);
     int scheduled = stats['scheduled']!;
     int attended = stats['attended']!;
     
-    double rate = scheduled == 0 ? 0.0 : (attended / scheduled) * 100;
-    int absent = (scheduled - attended) < 0 ? 0 : (scheduled - attended);
-
+    double rate = 0.0;
+    if (scheduled > 0) {
+      rate = (attended / scheduled) * 100;
+    } else if (attended > 0) {
+      rate = 100.0; // They worked even though 0 shifts were scheduled
+    }
+    
     // If they attended more than scheduled (early clock-in), just show 100%
-    if (attended > scheduled) rate = 100.0;
+    if (rate > 100) rate = 100.0;
+
+    int absent = (scheduled - attended) < 0 ? 0 : (scheduled - attended);
 
     return {
       'rate': rate,

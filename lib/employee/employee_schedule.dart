@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use, use_build_context_synchronously
+
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -32,6 +34,7 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
   String formattedTime = DateFormat('h:mm a').format(DateTime.now());
   
   // --- 1. DECLARE ALL STREAMS HERE ---
+  // ignore: unused_field
   late Stream<QuerySnapshot> _allShiftStream;
   late Stream<QuerySnapshot> _upcomingShiftStream;
   late Stream<QuerySnapshot> _pendingLeaveStream;
@@ -202,7 +205,7 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
                           stream: _upcomingShiftStream,
                           builder: (context, snapshot) {
                             if (snapshot.hasError) {
-                              print("Shift Stream Error: ${snapshot.error}");
+                              debugPrint("Shift Stream Error: ${snapshot.error}");
                               return const Center(child: Text("Error loading shifts"));
                             }
                             // --- 4. PREVENT FLICKER BY CHECKING !snapshot.hasData ---
@@ -269,8 +272,9 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
                           // --- 5. USE INITIALIZED STREAM HERE ---
                           stream: _leaveRequestsStream,
                           builder: (context, snapshot) {
-                            if (snapshot.hasError) 
-                              print("${snapshot.error}");
+                            if (snapshot.hasError) {
+                              debugPrint("${snapshot.error}");
+                            }
                             if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
                               return const Center(child: CircularProgressIndicator());
                             }
@@ -645,7 +649,7 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
         'managerReason': null,
       }, SetOptions(merge: true)); 
     } catch (e) {
-      throw e; 
+      rethrow; 
     }
   }
 

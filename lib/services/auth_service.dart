@@ -247,7 +247,7 @@ class AuthService {
       // Convert to Firestore Timestamp
       Timestamp todayTimestamp = Timestamp.fromDate(todayMidnight);
 
-      String status = "Unscheduled";
+      String status = "Extra";
       String? shiftID;
 
       // 2. Fetch gracePeriod

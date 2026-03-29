@@ -167,7 +167,7 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
                       child: FutureBuilder<double>(
                         future: AttendanceCount.getAttendanceRate(widget.employeeID),
                         builder: (context, snapshot) {
-                          if (snapshot.connectionState == ConnectionState.waiting) return LinearProgressIndicator();
+                          if (snapshot.connectionState == ConnectionState.waiting) return const LinearProgressIndicator();
                           return Text("${snapshot.data?.toStringAsFixed(0)}%");
                         },
                       ),
@@ -185,7 +185,7 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
                       child: FutureBuilder<int>(
                         future: AttendanceCount.getAbsentCount(widget.employeeID),
                         builder: (context, snapshot) {
-                          if (snapshot.connectionState == ConnectionState.waiting) return LinearProgressIndicator();
+                          if (snapshot.connectionState == ConnectionState.waiting) return const LinearProgressIndicator();
                           return Text("${snapshot.data?.toStringAsFixed(0)}%");
                         },
                       ),
@@ -303,7 +303,7 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
                                             String formattedDate = date != null ? DateFormat('dd MMM').format(date) : "--";
                                             String formattedIn = start != null ? DateFormat('hh:mm a').format(start) : "--:--";
                                             String formattedOut = end != null ? DateFormat('hh:mm a').format(end) : "--:--";
-                                            String status = data['attendanceStatus'] ?? "Unscheduled";
+                                            String status = data['attendanceStatus'] ?? "Extra";
                                             String approval = data['attendanceApproval'] ?? "Pending";
 
                                             String duration = "--";
@@ -343,7 +343,7 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.bgLightBlue,
                   foregroundColor: AppColors.primaryBlue,
-                  side: BorderSide(width: 2, color: AppColors.primaryBlue),
+                  side: const BorderSide(width: 2, color: AppColors.primaryBlue),
                   padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
                   minimumSize: const Size(double.infinity, 50), // Makes button full width
                 ),
@@ -354,11 +354,20 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
                     );
                     return;
                   }
+                  
+                  int attendedCount = _currentDocs.length;
+                  int absentCount = _currentAbsences.length;
+                  int totalScheduled = attendedCount + absentCount;
+                  double attendanceRate = totalScheduled == 0 ? 0.0 : (attendedCount / totalScheduled) * 100;
+
                   PdfExportService.exportAttendanceReport(
                     title: "My Attendance Report",
                     docs: _currentDocs, 
                     absentShifts: _currentAbsences, 
                     period: _selectedPeriod,
+                    userRole: 'employee',
+                    attendanceRate: attendanceRate,
+                    absentCount: absentCount,
                   );
                 },
               ),

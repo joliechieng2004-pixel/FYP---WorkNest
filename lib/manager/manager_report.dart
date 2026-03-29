@@ -215,7 +215,7 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.white,
                                 foregroundColor: AppColors.primaryBlue,
-                                side: BorderSide(width: 2, color: AppColors.primaryBlue),
+                                side: const BorderSide(width: 2, color: AppColors.primaryBlue),
                                 padding: const EdgeInsets.all(15),
                                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))
                               ),
@@ -232,6 +232,7 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
                                   docs: attendanceDocs,
                                   absentShifts: absentShifts, // NEW PARAMETER
                                   period: _selectedPeriod,
+                                  userRole: 'manager',
                                 );
                               },
                             ),
@@ -380,11 +381,14 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        attendance['attendanceStatus'] ?? 'Unscheduled',
+                        attendance['attendanceStatus'] ?? 'Extra',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: attendance['attendanceStatus'] == "Late" ? Colors.red : Colors.blue,
+                          color: {
+                            'Extra': Colors.orange,
+                            'Late': Colors.red,
+                          }[attendance['attendanceStatus']] ?? Colors.blue,
                         ),
                       ),
                       Text(
@@ -394,7 +398,7 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
                           color: status == "Approved"
                             ? Colors.green
                             : status == "Pending"
-                                ? Colors.yellow
+                                ? Colors.orange
                                 : Colors.red,
                         ),
                       ),

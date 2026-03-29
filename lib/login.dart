@@ -1,3 +1,5 @@
+// ignore_for_file: non_constant_identifier_names
+
 import 'package:flutter/material.dart';
 import 'package:worknest/services/auth_service.dart';
 import 'package:worknest/utils/app_colors.dart';

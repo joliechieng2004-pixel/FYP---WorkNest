@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use, use_build_context_synchronously
+
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -155,13 +157,13 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
         setState(() => _isLoadingSettings = false);
       }
     } catch (e) {
-      print("Error loading settings: $e");
+      debugPrint("Error loading settings: $e");
     }
   }
 
   Future<void> _loadOfficeData() async {
     if (deptCode.isEmpty) {
-      print("DEBUG: deptCode is empty. Waiting for user data...");
+      debugPrint("DEBUG: deptCode is empty. Waiting for user data...");
       // If it's empty, we might need to fetch the user profile first
       await _loadManagerData(); 
     }
@@ -172,7 +174,7 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
       if (deptDoc.exists && deptDoc.data() != null) {
         Map<String, dynamic> data = deptDoc.data() as Map<String, dynamic>;
 
-        print("DEBUG: Found department: ${deptDoc.id}");
+        debugPrint("DEBUG: Found department: ${deptDoc.id}");
 
         // 1. Get the nested map first
         Map<String, dynamic>? attendanceSettings = data['attendanceSettings'] as Map<String, dynamic>?;
@@ -192,11 +194,11 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
           });
         }
       } else {
-        print("DEBUG: No document found at departments/$deptCode");
+        debugPrint("DEBUG: No document found at departments/$deptCode");
         setState(() => addressName = "Department Not Found ($deptCode)");
       }
     } catch (e) {
-      print("Error loading office data: $e");
+      debugPrint("Error loading office data: $e");
       setState(() => addressName = "Error loading location");
     }
   }
@@ -1191,7 +1193,7 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
     // If the user picked a location and didn't just press 'back'
     if (result != null && result is Map<String, dynamic>) {
       // check what is actually coming back from the location_picker
-      print("Map Result Recieved: $result");
+      debugPrint("Map Result Recieved: $result");
       
       setState(() {
         selectedLat = result['lat'];
@@ -1209,7 +1211,7 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
         debugPrint("MANAGER PROFILE: Received $addressName");
       });
 
-      print("State Updated: $addressName at $selectedLat, $selectedLng");
+      debugPrint("State Updated: $addressName at $selectedLat, $selectedLng");
     }
   }
 

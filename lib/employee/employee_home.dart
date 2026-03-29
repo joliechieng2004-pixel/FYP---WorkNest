@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -154,7 +156,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
           await _fetchOfficeCoordinates(fetchedDeptCode);
         }
       } catch (e) {
-        print("Error loading employee or office data: $e");
+        debugPrint("Error loading employee or office data: $e");
       }
     }
   }
@@ -184,10 +186,10 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
             }
           });
         }
-        print("DEBUG: Office coordinates loaded for $code");
+        debugPrint("DEBUG: Office coordinates loaded for $code");
       }
     } catch (e) {
-      print("Error fetching department coordinates: $e");
+      debugPrint("Error fetching department coordinates: $e");
     }
   }
 
@@ -291,7 +293,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
         showSelectedLabels: false,
         showUnselectedLabels: false,
         onTap: (index) {
-          print("Swithcing to index: $index");
+          debugPrint("Swithcing to index: $index");
           setState(() {
             _selectedIndex = index; // This triggers the UI refresh
           });
@@ -494,7 +496,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
                               String formattedOut = end != null ? DateFormat('hh:mm a').format(end) : "--:--";
                                               
                               return _buildShiftScheduleCard(
-                                formattedDate, formattedIn, formattedOut, "Office"
+                                formattedDate, formattedIn, formattedOut
                               );
                             },
                           ),
@@ -635,7 +637,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
       } catch (e) {
         if (Navigator.canPop(context)) Navigator.pop(context);
         _showSnackBar("System Error: $e", Colors.red);
-        print(e);
+        debugPrint(e as String?);
       }
     }
   }
@@ -899,7 +901,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
     });
   }
 
-  Widget _buildShiftScheduleCard(String date, String clockIn, String clockOut, String location) {
+  Widget _buildShiftScheduleCard(String date, String clockIn, String clockOut) {
     return Container(
       width: double.infinity, // Fixed width for horizontal scrolling
       padding: const EdgeInsets.all(15),
@@ -915,8 +917,6 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
           Text(date, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           const SizedBox(height: 5),
           Text("Shift Time: $clockIn - $clockOut", style: const TextStyle(color: Colors.black87)),
-          const SizedBox(height: 5),
-          Text("Location: $location", style: const TextStyle(color: Colors.black87)),
         ],
       ),
     );
@@ -935,7 +935,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text("No Shift Scheduled"),
-        content: const Text("You aren't scheduled for today. Do you still insist to clock in as 'Unscheduled'?"),
+        content: const Text("You aren't scheduled for today. Do you still insist to clock in as 'Extra'?"),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
           TextButton(onPressed: () => Navigator.pop(context, true), child: const Text("Clock In anyway")),

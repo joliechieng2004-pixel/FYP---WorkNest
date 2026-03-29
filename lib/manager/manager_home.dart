@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use, use_build_context_synchronously
+
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -106,7 +108,7 @@ class _ManagerHomePageState extends State<ManagerHome> {
         showSelectedLabels: false,
         showUnselectedLabels: false,
         onTap: (index) {
-          print("Swithcing to index: $index");
+          debugPrint("Swithcing to index: $index");
           setState(() {
             _selectedIndex = index; // This triggers the UI refresh
           });
@@ -142,7 +144,7 @@ class _ManagerHomePageState extends State<ManagerHome> {
                 Expanded(
                   flex: 1,
                   child: IconButton.outlined(
-                    icon: Icon(Icons.logout, color: AppColors.primaryBlue),
+                    icon: const Icon(Icons.logout, color: AppColors.primaryBlue),
                     onPressed: _showLogoutConfirmation
                   ),
                 ),
@@ -164,7 +166,7 @@ class _ManagerHomePageState extends State<ManagerHome> {
                     flex: 5,
                     child: SelectableText(
                       deptCode, 
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: AppColors.primaryBlue,
@@ -307,9 +309,9 @@ class _ManagerHomePageState extends State<ManagerHome> {
 
   Widget _buildPeriodToggle() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
+      padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 10.0),
       child: SizedBox(
-        width: double.infinity, // 1. Force the container to full width
+        width: double.infinity, // Force the container to full width
         child: SegmentedButton<String>(
           // 2. Hide the check icon to keep label centering consistent
           showSelectedIcon: false, 
@@ -390,7 +392,7 @@ class _ManagerHomePageState extends State<ManagerHome> {
             builder: (context, snapshot) {
               if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
 
-              if (snapshot.hasError) print(snapshot.error);
+              if (snapshot.hasError) debugPrint(snapshot.error as String?);
               
               final docs = snapshot.data!.docs;
               if (docs.isEmpty) return const Center(child: Text("No records found."));
@@ -494,14 +496,14 @@ class _ManagerHomePageState extends State<ManagerHome> {
   Map<String, int> _calculateStats(List<QueryDocumentSnapshot> docs) {
     int onTime = 0;
     int late = 0;
-    int unscheduled = 0;
+    int extra = 0;
 
     for (var doc in docs) {
       // 1. Safely extract the data
       final data = doc.data() as Map<String, dynamic>;
       
       // 2. Get the status string (default to Unscheduled if null)
-      final String status = data['attendanceStatus']?.toString() ?? 'Unscheduled';
+      final String status = data['attendanceStatus']?.toString() ?? 'Extra';
 
       // 3. Increment the correct counter in one single loop
       switch (status) {
@@ -512,7 +514,7 @@ class _ManagerHomePageState extends State<ManagerHome> {
           late++;
           break;
         default:
-          unscheduled++;
+          extra++;
           break;
       }
     }
@@ -521,7 +523,7 @@ class _ManagerHomePageState extends State<ManagerHome> {
     return {
       'onTime': onTime,
       'late': late,
-      'unscheduled': unscheduled,
+      'extra': extra,
       'total': docs.length,
     };
   }

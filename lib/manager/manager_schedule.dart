@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -57,6 +59,7 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
       if (_isOffline) {
         _showOfflineBanner();
       } else {
+        // ignore: use_build_context_synchronously
         ScaffoldMessenger.of(context).clearMaterialBanners();
       }
     });
@@ -90,8 +93,8 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
     // 2. Force the date to the very end of the LOCAL day
     DateTime localEnd = DateTime(_selectedDay!.year, _selectedDay!.month, _selectedDay!.day, 23, 59, 59, 999);
 
-    print("Querying from: ${localStart.toIso8601String()}");
-    print("Querying to: ${localEnd.toIso8601String()}");
+    debugPrint("Querying from: ${localStart.toIso8601String()}");
+    debugPrint("Querying to: ${localEnd.toIso8601String()}");
 
     _shiftStream = FirebaseFirestore.instance
             .collection('shifts')
@@ -114,14 +117,14 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
 
   // DEBUG PURPOSE
   void _debugCheckDatabase() async {
-    print("--- DATABASE INSPECTION START ---");
+    debugPrint("--- DATABASE INSPECTION START ---");
     var snapshot = await FirebaseFirestore.instance
         .collection('shifts')
         .where('deptCode', isEqualTo: widget.deptCode)
         .get();
 
     if (snapshot.docs.isEmpty) {
-      print("Zero shifts found even WITHOUT date filtering. Check your deptCode!");
+      debugPrint("Zero shifts found even WITHOUT date filtering. Check your deptCode!");
     }
 
     for (var doc in snapshot.docs) {
@@ -129,12 +132,12 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
       var dateField = data['shiftDate'];
       
       if (dateField is Timestamp) {
-        print("Doc ID: ${doc.id} | Date: ${dateField.toDate()} | Type: Timestamp");
+        debugPrint("Doc ID: ${doc.id} | Date: ${dateField.toDate()} | Type: Timestamp");
       } else {
-        print("Doc ID: ${doc.id} | Date: $dateField | Type: ${dateField.runtimeType} (ERROR: Should be Timestamp)");
+        debugPrint("Doc ID: ${doc.id} | Date: $dateField | Type: ${dateField.runtimeType} (ERROR: Should be Timestamp)");
       }
     }
-    print("--- DATABASE INSPECTION END ---");
+    debugPrint("--- DATABASE INSPECTION END ---");
   }
 
   @override
@@ -191,7 +194,7 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
 
                       _updateStreams(selectedDay);
                     });
-                    print("Selected Date: $_selectedDay");
+                    debugPrint("Selected Date: $_selectedDay");
                   },
                   onFormatChanged: (format) {
                     setState(() {
@@ -225,7 +228,7 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
                             stream: _shiftStream,
                             builder: (context, shiftSnapshot) {
                               if (shiftSnapshot.hasError) {
-                                print("Firestore Error: ${shiftSnapshot.error}");
+                                debugPrint("Firestore Error: ${shiftSnapshot.error}");
                                 return const Center(child: Text("Error loading shifts. Check console for index link."));
                               }
 
@@ -233,7 +236,7 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
                                 stream: _leaveStream,
                                 builder: (context, leaveSnapshot) {
                                   if (leaveSnapshot.hasError) {
-                                    print("Firestore Error: ${leaveSnapshot.error}");
+                                    debugPrint("Firestore Error: ${leaveSnapshot.error}");
                                     return const Center(child: Text("Error loading leaves. Check console for index link."));
                                   }
 
@@ -241,7 +244,7 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
                                     stream: _userStream,
                                     builder: (context, userSnapshot) {
                                       if (userSnapshot.hasError) {
-                                        print("Firestore Error: ${userSnapshot.error}");
+                                        debugPrint("Firestore Error: ${userSnapshot.error}");
                                         return const Center(child: Text("Error loading users. Check console for index link."));
                                       }
                                       
@@ -266,8 +269,8 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
 
                                       // --- DEBUGGING PRINTS ---
                                       debugPrint("--- DEBUG START ---");
-                                      print("Active Shifts Found: ${activeShifts.length}");
-                                      print("Active Leaves Found: ${activeLeaves.length}");
+                                      debugPrint("Active Shifts Found: ${activeShifts.length}");
+                                      debugPrint("Active Leaves Found: ${activeLeaves.length}");
                                   
                                       Map<String, String> employeeStatusMap = {};
 
@@ -275,18 +278,18 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
                                       // If they are on leave, mark them as 'on-leave'.
                                       for (var doc in activeLeaves) {
                                         var data = doc.data() as Map<String, dynamic>;
-                                        print("Leave Document Data: $data"); // Check what fields actually exist!
+                                        debugPrint("Leave Document Data: $data"); // Check what fields actually exist!
                                         
                                         // REPLACE 'leaveUserID' with your actual field name if it's different
                                         String? leaveUser = data['leaveUserID']; 
                                         if (leaveUser != null) {
                                           employeeStatusMap[leaveUser] = 'on-leave'; 
-                                          print("Marked $leaveUser as on-leave");
+                                          debugPrint("Marked $leaveUser as on-leave");
                                         } else {
-                                          print("WARNING: 'leaveUserID' is null for document ${doc.id}");
+                                          debugPrint("WARNING: 'leaveUserID' is null for document ${doc.id}");
                                         }
                                       }
-                                      print("--- DEBUG END ---");
+                                      debugPrint("--- DEBUG END ---");
 
                                       // 4. Process Shifts SECOND.
                                       // Only add the shift status if they are NOT on leave.
@@ -353,8 +356,9 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
                             .snapshots(),
                         builder: (context, snapshot) {
                           // 2. Handle Loading & Errors
-                          if (snapshot.hasError) 
-                            print("$snapshot.error");
+                          if (snapshot.hasError) {
+                            debugPrint("$snapshot.error");
+                          }
                           if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
                             return const Center(child: CircularProgressIndicator());
                           }

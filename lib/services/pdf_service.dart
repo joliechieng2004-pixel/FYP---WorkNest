@@ -10,6 +10,9 @@ class PdfExportService {
     required List<QueryDocumentSnapshot> docs,
     List<Map<String, dynamic>>? absentShifts,
     required String period,
+    String? userRole,
+    double? attendanceRate,
+    int? absentCount,
   }) async {
     final pdf = pw.Document();
 
@@ -29,6 +32,22 @@ class PdfExportService {
           ),
           
           pw.SizedBox(height: 20),
+
+          if (userRole == 'employee' && attendanceRate != null && absentCount != null) ...[
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.start,
+              children: [
+                pw.Text("Attendance Rate: ${attendanceRate.toStringAsFixed(1)}%", 
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.green)),
+                pw.SizedBox(width: 20),
+                pw.Text("Total Absences: $absentCount", 
+                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold, color: PdfColors.red)),
+              ],
+            ),
+            pw.SizedBox(height: 10),
+            pw.Divider(thickness: 1, color: PdfColors.grey400),
+            pw.SizedBox(height: 10),
+          ],
 
           pw.Text("Absences List", style: pw.TextStyle(fontSize: 16, fontWeight: pw.FontWeight.bold)),
           
