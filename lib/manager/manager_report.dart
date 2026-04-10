@@ -23,10 +23,11 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
   // The master stream variable
   late Stream<ReportData> _masterReportStream;
 
+  // --- INITIALIZATION ---
   @override
   void initState() {
     super.initState();
-    _initStreams(); // Initialize the stream immediately
+    _initStreams();
   }
 
   // Centralized stream initialization
@@ -139,6 +140,7 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
     super.dispose();
   }
 
+  // --- WIDGTES ---
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -155,12 +157,11 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. The Period Toggle
               _buildPeriodToggle(),
 
               const SizedBox(height: 10),
               
-              // 5. The Master StreamBuilder holding both sections
+              // Master StreamBuilder holding both sections
               SizedBox(
                 height: 800,
                 child: StreamBuilder<ReportData>(
@@ -186,7 +187,7 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
                           child: Text("Absent / Unattended Shifts:", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.red)),
                         ),
                         Expanded(
-                          flex: 1, // Takes up half the list space
+                          flex: 1,
                           child: _buildAbsentContainer(absentShifts),
                         ),
 
@@ -198,7 +199,7 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
                           child: Text("Attendance Log:", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                         ),
                         Expanded(
-                          flex: 2, // Takes up half the list space
+                          flex: 2,
                           child: _buildAttendanceContainer(attendanceDocs),
                         ),
 
@@ -230,7 +231,7 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
                                 PdfExportService.exportAttendanceReport(
                                   title: "Department Attendance Report",
                                   docs: attendanceDocs,
-                                  absentShifts: absentShifts, // NEW PARAMETER
+                                  absentShifts: absentShifts,
                                   period: _selectedPeriod,
                                   userRole: 'manager',
                                 );
@@ -250,7 +251,70 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
     );
   }
 
-  // ADDED: UI Container for Absent List
+  // --- PERIOD TOGGLE ---
+  DateTime _getStartTime(String period) {
+    DateTime now = DateTime.now();
+    switch (period) {
+      case "All":
+        return DateTime(2000, 1, 1);
+      case "Weekly":
+        DateTime startOfWeek = now.subtract(Duration(days: now.weekday - 1))
+            .copyWith(hour: 0, minute: 0, second: 0, millisecond: 0, microsecond: 0);
+        return startOfWeek;
+      case "Monthly":
+        return DateTime(now.year, now.month, 1);
+      case "Yearly":
+        return DateTime(now.year, 1, 1);
+      default:
+        return now;
+    }
+  }
+
+  Widget _buildPeriodToggle() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
+      child: SizedBox(
+        width: double.infinity, 
+        child: SegmentedButton<String>(
+          showSelectedIcon: false, 
+          segments: const [
+            ButtonSegment(
+              value: "All", 
+              label: Center(child: Text("All")),
+            ),
+            ButtonSegment(
+              value: "Weekly", 
+              label: Center(child: Text("Week")), 
+            ),
+            ButtonSegment(
+              value: "Monthly", 
+              label: Center(child: Text("Month")),
+            ),
+            ButtonSegment(
+              value: "Yearly", 
+              label: Center(child: Text("Year")),
+            ),
+          ],
+          selected: {_selectedPeriod},
+          onSelectionChanged: (Set<String> newSelection) {
+            setState(() {
+              _selectedPeriod = newSelection.first;
+              _initStreams();
+            });
+          },
+          style: SegmentedButton.styleFrom(
+            selectedBackgroundColor: AppColors.primaryBlue,
+            selectedForegroundColor: AppColors.bgLightBlue,
+            visualDensity: VisualDensity.comfortable,
+            side: const BorderSide(width: 1, color: Colors.grey),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Absent List
   Widget _buildAbsentContainer(List<Map<String, dynamic>> absentShifts) {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 5),
@@ -281,7 +345,7 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
     );
   }
 
-  // EXTRACTED: Original Attendance Container UI
+  // Attendance Container
   Widget _buildAttendanceContainer(List<QueryDocumentSnapshot> docs) {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 5),
@@ -546,68 +610,6 @@ class _ManagerReportPageState extends State<ManagerReportPage> {
         );
       }
     }
-  }
-
-  DateTime _getStartTime(String period) {
-    DateTime now = DateTime.now();
-    switch (period) {
-      case "All":
-        return DateTime(2000, 1, 1);
-      case "Weekly":
-        DateTime startOfWeek = now.subtract(Duration(days: now.weekday - 1))
-            .copyWith(hour: 0, minute: 0, second: 0, millisecond: 0, microsecond: 0);
-        return startOfWeek;
-      case "Monthly":
-        return DateTime(now.year, now.month, 1);
-      case "Yearly":
-        return DateTime(now.year, 1, 1);
-      default:
-        return now;
-    }
-  }
-
-  Widget _buildPeriodToggle() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 10.0),
-      child: SizedBox(
-        width: double.infinity, 
-        child: SegmentedButton<String>(
-          showSelectedIcon: false, 
-          segments: const [
-            ButtonSegment(
-              value: "All", 
-              label: Center(child: Text("All")),
-            ),
-            ButtonSegment(
-              value: "Weekly", 
-              label: Center(child: Text("Week")), 
-            ),
-            ButtonSegment(
-              value: "Monthly", 
-              label: Center(child: Text("Month")),
-            ),
-            ButtonSegment(
-              value: "Yearly", 
-              label: Center(child: Text("Year")),
-            ),
-          ],
-          selected: {_selectedPeriod},
-          onSelectionChanged: (Set<String> newSelection) {
-            setState(() {
-              _selectedPeriod = newSelection.first;
-              _initStreams();
-            });
-          },
-          style: SegmentedButton.styleFrom(
-            selectedBackgroundColor: AppColors.primaryBlue,
-            selectedForegroundColor: AppColors.bgLightBlue,
-            visualDensity: VisualDensity.comfortable,
-            side: const BorderSide(width: 1, color: Colors.grey),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          ),
-        ),
-      ),
-    );
   }
 }
 

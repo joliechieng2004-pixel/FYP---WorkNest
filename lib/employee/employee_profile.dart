@@ -597,6 +597,7 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
     }
   }
 
+  // --- EMAIL VERIFICATION ---
   // Verify User Credential before Update New Email
   Future<void> _showPasswordDialog(String newEmail) async {
     final TextEditingController passwordController = TextEditingController();
@@ -672,6 +673,34 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
     }
   }
 
+  // Email Verification Status
+  Future<void> _refreshVerificationStatus() async {
+    try {
+      User? user = FirebaseAuth.instance.currentUser;
+      
+      // This is the key command—it forces a fetch from Firebase Auth
+      await user?.reload(); 
+
+      if (user?.emailVerified ?? false) {
+        setState(() {
+          isWaitingForVerification = false; // Switch back to the green icon
+        });
+
+        _showSnackBar("Email verified successfully!", Colors.green);
+        
+        // Also update Firestore to keep the 'emailVerified' flag in sync
+        await FirebaseFirestore.instance.collection('users').doc(docID).update({
+          'emailVerified': true,
+        });
+      } else {
+        _showSnackBar("Email not verified yet. Please check your inbox.", Colors.orange);
+      }
+    } catch (e) {
+      _showSnackBar("Error refreshing status: $e", Colors.red);
+    }
+  }
+
+  // --- CHANGE PASSWORD ---
   Future<void> _validateAndUpdatePassword() async {
     String newPass = _newPasswordController.text.trim();
     String confirmPass = _confirmPasswordController.text.trim();
@@ -762,67 +791,6 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
     );
   }
 
-  // Email Verification Status
-  Future<void> _refreshVerificationStatus() async {
-    try {
-      User? user = FirebaseAuth.instance.currentUser;
-      
-      // This is the key command—it forces a fetch from Firebase Auth
-      await user?.reload(); 
-
-      if (user?.emailVerified ?? false) {
-        setState(() {
-          isWaitingForVerification = false; // Switch back to the green icon
-        });
-
-        _showSnackBar("Email verified successfully!", Colors.green);
-        
-        // Also update Firestore to keep the 'emailVerified' flag in sync
-        await FirebaseFirestore.instance.collection('users').doc(docID).update({
-          'emailVerified': true,
-        });
-      } else {
-        _showSnackBar("Email not verified yet. Please check your inbox.", Colors.orange);
-      }
-    } catch (e) {
-      _showSnackBar("Error refreshing status: $e", Colors.red);
-    }
-  }
-
-  // Helper to clean up after successful update
-  void _onSuccessUpdate() {
-    _showSnackBar("Password updated successfully!", Colors.green);
-    _newPasswordController.clear();
-    _confirmPasswordController.clear();
-    setState(() => _expandedIndex = 0);
-  }
-
-  // Helper for showing messages
-  void _showSnackBar(String message, Color color) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: color),
-    );
-  }
-
-  Widget _buildRadioOption(String title, int value) {
-    return RadioListTile<int>(
-      title: Text(title),
-      value: value,
-      groupValue: notifyShift,
-      activeColor: const Color.fromARGB(255, 40, 75, 158),
-      onChanged: (int? val) => setState(() => notifyShift = val!),
-    );
-  }
-
-  Widget _buildSwitchOption(String title, bool value, Function(bool) onChanged) {
-    return SwitchListTile(
-      title: Text(title),
-      value: value,
-      activeThumbColor: const Color.fromARGB(255, 40, 75, 158),
-      onChanged: onChanged,
-    );
-  }
-
   Future<void> _updateNotificationSettings() async {
     try {
       await _db.collection('users').doc(docID).update({
@@ -840,30 +808,17 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
     }
   }
 
-  void _cancelEdit() {
-    setState(() {
-      // 1. Reset text controllers to the original variables fetched from Firestore
-      _profileFNameController.text = fName;
-      _profileLNameController.text = lName;
-      _profileEmailController.text = email;
-      _profileContactController.text = contact;
-
-      // 2. Collapse the card
-      _expandedIndex = 0;
-    });
-  }
-
   void _showLogoutConfirmation() {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Row(
+          title: const Row(
             children: [
               Icon(Icons.logout, color: AppColors.primaryBlue),
-              const SizedBox(width: 10),
-              const Text("Confirm Logout"),
+              SizedBox(width: 10),
+              Text("Confirm Logout"),
             ],
           ),
           content: const Text("Are you sure you want to log out of WorkNest?"),
@@ -894,6 +849,54 @@ class _EmployeeProfilePageState extends State<EmployeeProfile> {
           ],
         );
       },
+    );
+  }
+
+  // --- OTHERS ---
+  // Helper for showing messages
+  void _showSnackBar(String message, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: color),
+    );
+  }
+
+  void _cancelEdit() {
+    setState(() {
+      // 1. Reset text controllers to the original variables fetched from Firestore
+      _profileFNameController.text = fName;
+      _profileLNameController.text = lName;
+      _profileEmailController.text = email;
+      _profileContactController.text = contact;
+
+      // 2. Collapse the card
+      _expandedIndex = 0;
+    });
+  }
+
+  // Helper to clean up after successful update
+  void _onSuccessUpdate() {
+    _showSnackBar("Password updated successfully!", Colors.green);
+    _newPasswordController.clear();
+    _confirmPasswordController.clear();
+    setState(() => _expandedIndex = 0);
+  }
+
+  Widget _buildRadioOption(String title, int value) {
+    return RadioListTile<int>(
+      title: Text(title),
+      value: value,
+      groupValue: notifyShift,
+      activeColor: const Color.fromARGB(255, 40, 75, 158),
+      onChanged: (int? val) => setState(() => notifyShift = val!),
+    );
+  }
+
+  Widget _buildSwitchOption(String title, bool value, Function(bool) onChanged) {
+    return SwitchListTile(
+      title: Text(title),
+      value: value,
+      activeThumbColor: const Color.fromARGB(255, 40, 75, 158),
+      onChanged: onChanged,
     );
   }
 }

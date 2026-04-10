@@ -33,9 +33,8 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
   String formattedDate = DateFormat('EEEE, d MMM yyyy').format(DateTime.now());
   String formattedTime = DateFormat('h:mm a').format(DateTime.now());
   
-  // --- 1. DECLARE ALL STREAMS HERE ---
+  // --- DECLARE ALL STREAMS---
   // ignore: unused_field
-  late Stream<QuerySnapshot> _allShiftStream;
   late Stream<QuerySnapshot> _upcomingShiftStream;
   late Stream<QuerySnapshot> _pendingLeaveStream;
   late Stream<QuerySnapshot> _pendingShiftStream;
@@ -76,24 +75,17 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
     );
   }
 
+  // 
   void _updateStream() {
     final date = DateTime.now();
     final startOfToday = DateTime(date.year, date.month, date.day, 0, 0, 0);
 
-    // --- 2. INITIALIZE ALL STREAMS ONCE ---
     setState(() {
-      _allShiftStream = FirebaseFirestore.instance
-          .collection('shifts')
-          .where('shiftUserID', isEqualTo: widget.employeeID)
-          .where('shiftDate', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfToday))
-          .orderBy('shiftDate', descending: false)
-          .snapshots();
-
       _upcomingShiftStream = FirebaseFirestore.instance
           .collection('shifts')
           .where('shiftUserID', isEqualTo: widget.employeeID)
           .where('shiftDate', isGreaterThanOrEqualTo: Timestamp.fromDate(
-              date.subtract(const Duration(hours: 1)))) // Current & Future
+              startOfToday.subtract(const Duration(hours: 1)))) // Current & Future
           .orderBy('shiftDate', descending: false) 
           .snapshots();
 
@@ -163,7 +155,6 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
                     ),
                     const Divider(color: Color(0xFF1A3E88)),
 
-                    // --- 3. USE INITIALIZED STREAMS HERE ---
                     _buildDynamicStatRow(
                       label: "Pending Leave",
                       stream: _pendingLeaveStream,
@@ -182,7 +173,7 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
 
               const SizedBox(height: 10),
 
-              // 2. Shift List for Employee
+              // Shift List for Employee
               _buildCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -208,7 +199,7 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
                               debugPrint("Shift Stream Error: ${snapshot.error}");
                               return const Center(child: Text("Error loading shifts"));
                             }
-                            // --- 4. PREVENT FLICKER BY CHECKING !snapshot.hasData ---
+                            
                             if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
                               return const Center(child: CircularProgressIndicator());
                             }
@@ -244,12 +235,12 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
 
               const SizedBox(height: 10),
 
-              // 3. Request Leave Button
+              // Request Leave Button
               _buildGlobalLeaveRequestCard(),
 
               const SizedBox(height: 10),
 
-              // 4. Leave Requests (Scrollable Version)
+              // Leave Requests (Scrollable Version)
               _buildCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -269,7 +260,6 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
                         controller: _leaveScrollController,
                         thumbVisibility: true, 
                         child: StreamBuilder<QuerySnapshot>(
-                          // --- 5. USE INITIALIZED STREAM HERE ---
                           stream: _leaveRequestsStream,
                           builder: (context, snapshot) {
                             if (snapshot.hasError) {
@@ -352,7 +342,7 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
     );
   }
 
-  // --- Shift ---
+  // --- SHIFT ---
   Widget _buildEmployeeShiftCard(Map<String, dynamic> data, String docID, String status) {
     DateTime? safeDate(dynamic val) {
       if (val is Timestamp) return val.toDate();
@@ -432,7 +422,79 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
     );
   }
 
-  // --- NEW WIDGET: Global Leave Request Card ---
+  Widget _buildActionButton(String label, Color color, VoidCallback onTap, bool isFilled, {bool isDisabled = false}) {
+    return SizedBox(
+      width: double.infinity,
+      height: 35,
+      child: ElevatedButton(
+        onPressed: isDisabled ? null : onTap,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: isFilled ? color : Colors.white,
+          foregroundColor: isFilled ? Colors.white : color,
+          disabledBackgroundColor: isFilled ? color.withOpacity(0.5) : Colors.grey.shade200,
+          disabledForegroundColor: isFilled ? Colors.white70 : Colors.grey,
+          side: BorderSide(color: isDisabled && !isFilled ? Colors.grey : color),
+          elevation: 0,
+          padding: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+        child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+      ),
+    );
+  }
+
+  void _showStatusConfirmation(String docID, String newStatus) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text("Confirm ${newStatus[0].toUpperCase()}${newStatus.substring(1)}"),
+        content: Text("Your action to $newStatus this shift may be permanent."),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: _isOffline ? null : () {
+              Navigator.pop(context); 
+              _updateStatus(docID, newStatus); 
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _isOffline ? Colors.grey : (newStatus == 'accepted' ? Colors.green : Colors.red),
+              foregroundColor: Colors.white,
+            ),
+            child: Text(_isOffline ? "No Internet" : "Confirm"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _updateStatus(String docID, String newStatus) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('shifts')
+          .doc(docID)
+          .update({'shiftStatus': newStatus});
+
+      if (!mounted) return; 
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Shift $newStatus successfully!"), 
+          backgroundColor: newStatus == 'accepted' ? Colors.green : Colors.red,
+          behavior: SnackBarBehavior.floating, 
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e"), backgroundColor: Colors.orange),
+      );
+    }
+  }
+
+  // --- LEAVE REQUEST ---
   Widget _buildGlobalLeaveRequestCard() {
     return Container(
       width: double.infinity,
@@ -653,78 +715,7 @@ class _EmployeeSchedulePageState extends State<EmployeeSchedule> {
     }
   }
 
-  Widget _buildActionButton(String label, Color color, VoidCallback onTap, bool isFilled, {bool isDisabled = false}) {
-    return SizedBox(
-      width: double.infinity,
-      height: 35,
-      child: ElevatedButton(
-        onPressed: isDisabled ? null : onTap,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: isFilled ? color : Colors.white,
-          foregroundColor: isFilled ? Colors.white : color,
-          disabledBackgroundColor: isFilled ? color.withOpacity(0.5) : Colors.grey.shade200,
-          disabledForegroundColor: isFilled ? Colors.white70 : Colors.grey,
-          side: BorderSide(color: isDisabled && !isFilled ? Colors.grey : color),
-          elevation: 0,
-          padding: EdgeInsets.zero,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-        child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-      ),
-    );
-  }
-
-  void _showStatusConfirmation(String docID, String newStatus) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text("Confirm ${newStatus[0].toUpperCase()}${newStatus.substring(1)}"),
-        content: Text("Your action to $newStatus this shift may be permanent."),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            onPressed: _isOffline ? null : () {
-              Navigator.pop(context); 
-              _updateStatus(docID, newStatus); 
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _isOffline ? Colors.grey : (newStatus == 'accepted' ? Colors.green : Colors.red),
-              foregroundColor: Colors.white,
-            ),
-            child: Text(_isOffline ? "No Internet" : "Confirm"),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _updateStatus(String docID, String newStatus) async {
-    try {
-      await FirebaseFirestore.instance
-          .collection('shifts')
-          .doc(docID)
-          .update({'shiftStatus': newStatus});
-
-      if (!mounted) return; 
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Shift $newStatus successfully!"), 
-          backgroundColor: newStatus == 'accepted' ? Colors.green : Colors.red,
-          behavior: SnackBarBehavior.floating, 
-        ),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: $e"), backgroundColor: Colors.orange),
-      );
-    }
-  }
-
+  // --- SHIFT SUMMARY ---
   Widget _buildDynamicStatRow({required String label, required Stream<QuerySnapshot> stream}) {
     return StreamBuilder<QuerySnapshot>(
       stream: stream,

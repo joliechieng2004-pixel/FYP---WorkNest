@@ -127,7 +127,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
     _connectivitySubscription.cancel();
     _timer?.cancel();
     _mainScrollController.dispose();
-    _shiftScrollController.dispose(); // Clean up the controller
+    _shiftScrollController.dispose();
     super.dispose(); 
   }
 
@@ -136,13 +136,13 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
     User? user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       try {
-        // Get Dept Code
         DocumentSnapshot userDoc = await FirebaseFirestore.instance
             .collection('users')
             .doc(user.uid)
             .get();
 
         if (userDoc.exists) {
+          // get dept code to load settings
           String fetchedDeptCode = userDoc['deptCode'];
 
           setState(() {
@@ -161,7 +161,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
     }
   }
 
-  // Fetch Office Data
+  // Fetch Office Location
   Future<void> _fetchOfficeCoordinates(String code) async {
     try {
       DocumentSnapshot deptDoc = await FirebaseFirestore.instance
@@ -194,7 +194,6 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
   }
 
   // --- HELPER TO FETCH SETTINGS ---
-  // Assuming 'deptCode' is available in your State class.
   Future<Map<String, bool>> _getDepartmentSettings() async {
     try {
       QuerySnapshot deptSnapshot = await FirebaseFirestore.instance
@@ -223,7 +222,6 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
   Future<void>  _checkCurrentAttendanceStatus() async {
     User? user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      // Reconstruct the same doc ID used in your clock-in logic
       String dateId = DateFormat('yyyy-MM-dd').format(DateTime.now());
       String docId = "${dateId}_${user.uid}";
 
@@ -268,7 +266,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
     }
     
     // Bottom Navigation
-      // pages
+    // pages
     final List<Widget> pages = [
       _buildHomeDashboard(context),                               // Index 0 - Home Page
       EmployeeSchedule(deptCode: deptCode, employeeID: employeeID),   // Index 1 - Schedule Page
@@ -283,7 +281,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
         children: pages,
       ),
 
-        // styles
+      // styles
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed, // Required for 5 items
         backgroundColor: const Color(0xFF1A3E88), // Dark Blue
@@ -390,12 +388,11 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
               child: StreamBuilder<QuerySnapshot>(
                 stream: _pendingShiftStream,
                 builder: (context, snapshot) {
-                  // 1. Handle Loading State
                   if (snapshot.connectionState == ConnectionState.waiting || !snapshot.hasData) {
                     return const Center(child: Text("Loading Shifts..."));
                   }
 
-                  // 2. Get the Count
+                  // Get the Count
                   int pendingCount = snapshot.data?.docs.length ?? 0;
 
                   return Row(
@@ -412,7 +409,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
                           ),
                         ],
                       ),
-                      // 3. Highlight the number if it's > 0
+                      // Highlight the number if it's > 0
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
@@ -451,7 +448,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
                   const SizedBox(height: 10),
                   
                   SizedBox(
-                    height: 300, // Set the height you want for the scrollable area
+                    height: 300,
                     child: StreamBuilder<QuerySnapshot>(
                       stream: _upcomingShiftStream,
                       builder: (context, snapshot) {
@@ -485,12 +482,12 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
                             itemBuilder: (context, index) {
                               var data = shifts[index].data() as Map<String, dynamic>;
                 
-                              // 1. Convert safely using the helper
+                              // Convert safely using the helper
                               DateTime? start = safeConvertToDateTime(data['shiftStartTime']);
                               DateTime? end = safeConvertToDateTime(data['shiftEndTime']);
                               DateTime? date = safeConvertToDateTime(data['shiftDate']);
                                               
-                              // 2. Format Strings
+                              // Format Strings
                               String formattedDate = date != null ? DateFormat('d MMM yyyy, EEEE').format(date) : "--";
                               String formattedIn = start != null ? DateFormat('hh:mm a').format(start) : "--:--";
                               String formattedOut = end != null ? DateFormat('hh:mm a').format(end) : "--:--";
@@ -531,7 +528,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
 
         GeoPoint currentGeoPoint;
         
-        // --- CHECK LOCATION (CONDITIONAL) ---
+        // --- CHECK LOCATION (when require GPS) ---
         if (requireGPS) {
           // Handle permissions and get position
           bool hasPermission = await LocationService.handleLocationPermission();
@@ -560,7 +557,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
             return;
           }
 
-          // ready to send location to the attendance log
+          // Ready to send location to the attendance log
           currentGeoPoint = GeoPoint(position.latitude, position.longitude);
         } else {
           // If GPS is skipped, provide a fallback location so your backend doesn't crash
@@ -592,7 +589,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
           if (!insist) return; // Exit if they click "Cancel"
         }
 
-        // --- FACE VERIFICATION (OPTIONAL) ---
+        // --- FACE VERIFICATION PLACEHOLDER (OPTIONAL) ---
         bool faceVerified = true;
         
         if (requireFace) {
@@ -607,7 +604,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
           }
         }
 
-        if (faceVerified) { // Face success (fake)
+        if (faceVerified) { // Face success (placeholder)
           // Re-open Loading Spinner for the database write
           showDialog(
             context: context,
@@ -642,7 +639,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
     }
   }
 
-  // --- CLOCK OUT LOGIC (Handles Rule 3) ---
+  // --- CLOCK OUT LOGIC  ---
   void _clockOutLogic() async {
     User? user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -663,7 +660,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
       // ignore: unused_local_variable
       GeoPoint currentGeoPoint;
 
-      // Rule 3: Verify Location Again (IF NEEDED)
+      // Verify Location Again (IF NEEDED)
       if (requireGPS) {
         bool hasPermission = await LocationService.handleLocationPermission();
 
@@ -695,7 +692,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
         currentGeoPoint = GeoPoint(officeLat, officeLng);
       }
 
-      // --- FACE VERIFICATION (OPTIONAL) ---
+      // --- FACE VERIFICATION (PLACEHOLDER) ---
       bool faceVerified = true;
       
       if (requireFace) {
@@ -750,18 +747,18 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
     } finally {_dismissSpinner();}
   }
 
-  // --- CLOCK OUT CONFIRMATION (Handles Rules 1 & 2) ---
+  // --- CLOCK OUT CONFIRMATION ---
   void _showClockOutConfirmation() async {
     User? user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    // Rule 1: Minimum 15 minutes attendance duration
+    // Minimum 15 minutes attendance duration
     if (_startTime != null) {
       int workedMinutes = DateTime.now().difference(_startTime!).inMinutes;
-      if (workedMinutes < 15) {
+      if (workedMinutes < 30) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("You must work for at least 15 minutes before clocking out. ($workedMinutes/15 min)"),
+            content: Text("You must work for at least 30 minutes before clocking out. ($workedMinutes/30 min)"),
             backgroundColor: Colors.red,
           ),
         );
@@ -779,7 +776,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
     bool isEarlyLeave = false;
 
     try {
-      // Rule 2: Check if clocking out before Scheduled End Time
+      // Check if clocking out before Scheduled End Time
       String dateId = DateFormat('yyyy-MM-dd').format(DateTime.now());
       String docId = "${dateId}_${user.uid}";
       
@@ -839,7 +836,6 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
     );
   }
   
-
   // --- LOCATION GETTER ---
   Future<Position?> _getCurrentLocation() async {
     bool serviceEnabled;
@@ -922,6 +918,7 @@ class _EmployeeHomePageState extends State<EmployeeHome> {
     );
   }
 
+  // --- OTHERS ---
   // Helper for showing messages
   void _showSnackBar(String message, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(

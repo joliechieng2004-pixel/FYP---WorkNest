@@ -18,7 +18,7 @@ class EmployeeReport extends StatefulWidget {
 
 class _EmployeeReportPageState extends State<EmployeeReport> {
   final ScrollController _timesheetScrollController = ScrollController();
-  final ScrollController _absentScrollController = ScrollController(); // Added for the new vertical list
+  final ScrollController _absentScrollController = ScrollController();
 
   String _selectedPeriod = "Weekly";
   
@@ -185,8 +185,11 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
                       child: FutureBuilder<int>(
                         future: AttendanceCount.getAbsentCount(widget.employeeID),
                         builder: (context, snapshot) {
+                          if (snapshot.hasError){
+                            debugPrint("Error: $snapshot.error");
+                          }
                           if (snapshot.connectionState == ConnectionState.waiting) return const LinearProgressIndicator();
-                          return Text("${snapshot.data?.toStringAsFixed(0)}%");
+                          return Text("${snapshot.data?.toStringAsFixed(0)}");
                         },
                       ),
                     )
@@ -218,7 +221,7 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
 
                     return Column(
                       children: [
-                        // 2. Absent List (Takes roughly half of available space)
+                        // Absent List
                         Expanded(
                           flex: 1,
                           child: _buildCard(
@@ -271,7 +274,7 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
 
                         const SizedBox(height: 10),
 
-                        // 3. Attendance List (Takes the other half of available space)
+                        // Attendance List
                         Expanded(
                           flex: 2,
                           child: _buildCard(
@@ -336,7 +339,7 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
 
               const SizedBox(height: 10),
 
-              // 4. Export PDF Button
+              // Export PDF Button
               ElevatedButton.icon(
                 icon: const Icon(Icons.picture_as_pdf),
                 label: const Text("Export My Report", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
@@ -345,7 +348,7 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
                   foregroundColor: AppColors.primaryBlue,
                   side: const BorderSide(width: 2, color: AppColors.primaryBlue),
                   padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 20),
-                  minimumSize: const Size(double.infinity, 50), // Makes button full width
+                  minimumSize: const Size(double.infinity, 50),
                 ),
                 onPressed: () {
                   if (_currentDocs.isEmpty && _currentAbsences.isEmpty) {
@@ -463,22 +466,7 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
     );
   }
 
-  DateTime _getStartDate(String period) {
-    DateTime now = DateTime.now();
-    switch (period) {
-      case "Weekly":
-        DateTime startOfWeek = now.subtract(Duration(days: now.weekday - 1))
-            .copyWith(hour: 0, minute: 0, second: 0, millisecond: 0, microsecond: 0);
-        return startOfWeek;
-      case "Monthly":
-        return DateTime(now.year, now.month, 1);
-      case "Yearly":
-        return DateTime(now.year, 1, 1);
-      default:
-        return now;
-    }
-  }
-
+  // --- PERIOD TOGGLE ---
   Widget _buildPeriodToggle() {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10.0),
@@ -508,6 +496,22 @@ class _EmployeeReportPageState extends State<EmployeeReport> {
         ),
       ),
     );
+  }
+
+  DateTime _getStartDate(String period) {
+    DateTime now = DateTime.now();
+    switch (period) {
+      case "Weekly":
+        DateTime startOfWeek = now.subtract(Duration(days: now.weekday - 1))
+            .copyWith(hour: 0, minute: 0, second: 0, millisecond: 0, microsecond: 0);
+        return startOfWeek;
+      case "Monthly":
+        return DateTime(now.year, now.month, 1);
+      case "Yearly":
+        return DateTime(now.year, 1, 1);
+      default:
+        return now;
+    }
   }
 }
 

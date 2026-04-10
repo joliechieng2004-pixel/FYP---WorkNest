@@ -88,9 +88,9 @@ class AuthService {
           'deptCode': newCode,
           'createdAt': FieldValue.serverTimestamp(),
           'settings': {
-            'notifyOnCheckIn': true,
-            'notifyOnLate': true,
-            'notifyOnAbsent': true,
+            'notifyCheckIn': true,
+            'notifyLate': true,
+            'notifyAbsent': true,
           },
         });
 
@@ -178,8 +178,7 @@ class AuthService {
     return 'Employee creation failed';
   }
 
-  // 4. LOGIN USER WITH DEPT CODE VERIFICATION
-  // Change the return type from Map? to String?
+  // LOGIN USER WITH DEPT CODE VERIFICATION
   Future<String?> loginUser({
     required String email,
     required String password,

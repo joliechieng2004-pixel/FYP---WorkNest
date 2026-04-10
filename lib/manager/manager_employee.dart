@@ -34,6 +34,7 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
   
   late Stream<QuerySnapshot> _userStream;
 
+  // --- INITIALIZATION ---
   @override
   void initState() {
     super.initState();
@@ -74,104 +75,108 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
   @override
   void dispose() {
     _connectivitySubscription.cancel();
-    _searchController.dispose(); // Always clean up controllers!
+    _searchController.dispose();
     super.dispose();
   }
 
+  // --- BUILD WIDGETS ---
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF0FAFF), // Light blue background
-      appBar: AppBar(
-        title: const Text("Manage Employees"),
-        centerTitle: true,
-        backgroundColor: const Color(0xFF1A3E88),
-        foregroundColor: Colors.white,
-      ),
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              child: firstRowElements(),
-            ),
-            const Padding(
-              padding: EdgeInsets.only(left: 20, top: 10),
-              child: Text("Employee List:", 
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            ),
-            
-            // The Styled List Container
-            Expanded(
-              child: Container(
-                margin: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(15),
-                  border: Border.all(color: const Color(0xFF1A3E88), width: 2),
-                ),
-                child: Column(
-                  children: [
-                    // Fixed Header Row
-                    _buildCustomHeader(),
-                    const Divider(height: 1, color: Color(0xFF1A3E88)),
-                    
-                    // Scrollable List of Employees
-                    Expanded(
-                      child: StreamBuilder<QuerySnapshot>(
-                        stream: _userStream,
-                        builder: (context, snapshot) {
-                          if (snapshot.hasError) {
-                            return const Center(child: Text("Something went wrong"));
-                          }
-                          if (snapshot.connectionState == ConnectionState.waiting) {
-                            return const Center(child: CircularProgressIndicator());
-                          }
-                          if (snapshot.data!.docs.isEmpty) {
-                            return const Center(child: Text("No employees found in this department."));
-                          }
-
-                          // --- FILTERING LOGIC ---
-                          final allDocs = snapshot.data!.docs;
-                          
-                          final filteredDocs = allDocs.where((doc) {
-                            final data = doc.data() as Map<String, dynamic>;
-                            String fName = (data['userFName'] ?? '').toString().toLowerCase();
-                            String lName = (data['userLName'] ?? '').toString().toLowerCase();
-                            String fullName = "$fName $lName";
+    return GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF0FAFF),
+        appBar: AppBar(
+          title: const Text("Manage Employees"),
+          centerTitle: true,
+          backgroundColor: const Color(0xFF1A3E88),
+          foregroundColor: Colors.white,
+        ),
+        body: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                child: firstRowElements(),
+              ),
+              const Padding(
+                padding: EdgeInsets.only(left: 20, top: 10),
+                child: Text("Employee List:", 
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ),
+              
+              // The Styled List Container
+              Expanded(
+                child: Container(
+                  margin: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(color: const Color(0xFF1A3E88), width: 2),
+                  ),
+                  child: Column(
+                    children: [
+                      // Fixed Header Row
+                      _buildCustomHeader(),
+                      const Divider(height: 1, color: Color(0xFF1A3E88)),
+                      
+                      // Scrollable List of Employees
+                      Expanded(
+                        child: StreamBuilder<QuerySnapshot>(
+                          stream: _userStream,
+                          builder: (context, snapshot) {
+                            if (snapshot.hasError) {
+                              return const Center(child: Text("Something went wrong"));
+                            }
+                            if (snapshot.connectionState == ConnectionState.waiting) {
+                              return const Center(child: CircularProgressIndicator());
+                            }
+                            if (snapshot.data!.docs.isEmpty) {
+                              return const Center(child: Text("No employees found in this department."));
+                            }
+      
+                            // Search Employee
+                            final allDocs = snapshot.data!.docs;
                             
-                            return fullName.contains(_searchQuery);
-                          }).toList();
-
-                          if (filteredDocs.isEmpty) {
-                            return const Center(
-                              child: Text("No employees found matching your search."),
+                            final filteredDocs = allDocs.where((doc) {
+                              final data = doc.data() as Map<String, dynamic>;
+                              String fName = (data['userFName'] ?? '').toString().toLowerCase();
+                              String lName = (data['userLName'] ?? '').toString().toLowerCase();
+                              String fullName = "$fName $lName";
+                              
+                              return fullName.contains(_searchQuery);
+                            }).toList();
+      
+                            if (filteredDocs.isEmpty) {
+                              return const Center(
+                                child: Text("No employees found matching your search."),
+                              );
+                            }
+      
+                            return ListView.builder(
+                              key: ValueKey(_searchQuery),
+                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                              itemCount: filteredDocs.length,
+                              itemBuilder: (context, index) {
+                                return _buildExpandableEmployeeRow(filteredDocs[index], index);
+                              },
                             );
-                          }
-
-                          return ListView.builder(
-                            key: ValueKey(_searchQuery),
-                            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-                            itemCount: filteredDocs.length,
-                            itemBuilder: (context, index) {
-                              return _buildExpandableEmployeeRow(filteredDocs[index], index);
-                            },
-                          );
-                        },
+                          },
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  // Header Row to match your table design
+  // Header Row 
   Widget _buildCustomHeader() {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
@@ -277,7 +282,7 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
   }
 
   // --- STUBS FOR YOUR EXISTING WIDGETS ---
-
+  // Search Bar and Add Button
   Widget firstRowElements() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -332,32 +337,7 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
     );
   }
 
-  void _showRemoveConfirmation(String docId) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text("Confirm Remove Employee", style: TextStyle(fontWeight:FontWeight(5)),),
-          content: const Text("Are you sure you want to remove the employee?"),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Cancel", style: TextStyle(color: Colors.black),),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context); // Close dialog
-                _removeEmployee(docId);       // Run the reset logic
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black),
-              child: const Text("Confirm"),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
+  // --- ADD EMPLOYEE ---
   void addEmployee() {
     final fNameController = TextEditingController();
     final lNameController = TextEditingController();
@@ -420,8 +400,18 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
                     const SnackBar(content: Text("Employee account created!"), backgroundColor: Colors.green),
                   );
                 } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text("Error: $result"), backgroundColor: Colors.red),
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text("Registration Failed", style: TextStyle(color: Colors.red)),
+                      content: Text(result),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text("OK"),
+                        )
+                      ],
+                    ),
                   );
                 }
               }
@@ -448,6 +438,33 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
         ),
         validator: (val) => val!.isEmpty ? "Required field" : null,
       ),
+    );
+  }
+  
+  // --- REMOVE EMPLOYEE ---
+  void _showRemoveConfirmation(String docId) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text("Confirm Remove Employee", style: TextStyle(fontWeight:FontWeight(5)),),
+          content: const Text("Are you sure you want to remove the employee?"),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancel", style: TextStyle(color: Colors.black),),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context); // Close dialog
+                _removeEmployee(docId);       // Run the reset logic
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black),
+              child: const Text("Confirm"),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -496,11 +513,13 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
     } catch (e) {
       if (mounted) Navigator.pop(context);
       _showSnackBar("Error: $e", Colors.red);
+      debugPrint("$e");
     }
   }
 
+  // --- VIEW EMPLOYEE PROFILE ---
   void _openEmployeeProfile(Map<String, dynamic> employeeData, String employeeID) async {
-    // 1. Show a simple loading indicator so the user knows something is happening
+    // Show a simple loading indicator so the user knows something is happening
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -508,13 +527,11 @@ class _ManagerEmployeePageState extends State<ManagerEmployee> {
     );
 
     try {
-      // 2. Fetch the combined stats (Rate and Absent Count) in one call
       final stats = await AttendanceCount.getFullAttendanceStats(employeeID);
 
-      // 3. Close the loading indicator
+      // Close the loading indicator
       if (mounted) Navigator.pop(context);
 
-      // 4. Open the actual Profile Dialog with REAL data
       if (mounted) {
         showDialog(
           context: context,

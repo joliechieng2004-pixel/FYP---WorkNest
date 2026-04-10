@@ -1,4 +1,4 @@
-// ignore_for_file: use_build_context_synchronously
+// ignore_for_file: duplicate_ignore, use_build_context_synchronously
 
 import 'dart:async';
 
@@ -32,7 +32,7 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
   CalendarFormat _calendarFormat = CalendarFormat.month;
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
-  bool _isDateSelected = false;
+  bool _isDateSelected = true;
   
   // Shift
   TimeOfDay _startTime = const TimeOfDay(hour: 9, minute: 0);
@@ -66,7 +66,7 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
     _selectedDay = DateTime.now(); // Default selection to today
     initStreams();
     // Debug Check
-    _debugCheckDatabase();
+    //_debugCheckDatabase();
   }
 
   void _showOfflineBanner() {
@@ -216,14 +216,13 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
 
               // 2. Employee List
               _isDateSelected
-                  ? _buildCard( // Moved OUTSIDE the builders
+                  ? _buildCard( 
                       color: Colors.white,
                       child: Column(
                         children: [
                           const Text("Employee List", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                           const Divider(color: Color(0xFF1A3E88)),
                           
-                          // Now only the list contents respond to the Stream
                           StreamBuilder<QuerySnapshot>(
                             stream: _shiftStream,
                             builder: (context, shiftSnapshot) {
@@ -248,7 +247,6 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
                                         return const Center(child: Text("Error loading users. Check console for index link."));
                                       }
                                       
-                                      // This loading indicator is now inside the card!
                                       if (userSnapshot.connectionState == ConnectionState.waiting) {
                                         return const Padding(
                                           padding: EdgeInsets.all(20.0),
@@ -274,13 +272,11 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
                                   
                                       Map<String, String> employeeStatusMap = {};
 
-                                      // 3. Process Leaves FIRST. 
-                                      // If they are on leave, mark them as 'on-leave'.
+                                      // If they are on leave, mark them as 'on-leave'
                                       for (var doc in activeLeaves) {
                                         var data = doc.data() as Map<String, dynamic>;
-                                        debugPrint("Leave Document Data: $data"); // Check what fields actually exist!
+                                        debugPrint("Leave Document Data: $data"); // Check what fields actually exist
                                         
-                                        // REPLACE 'leaveUserID' with your actual field name if it's different
                                         String? leaveUser = data['leaveUserID']; 
                                         if (leaveUser != null) {
                                           employeeStatusMap[leaveUser] = 'on-leave'; 
@@ -291,7 +287,6 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
                                       }
                                       debugPrint("--- DEBUG END ---");
 
-                                      // 4. Process Shifts SECOND.
                                       // Only add the shift status if they are NOT on leave.
                                       for (var doc in activeShifts) {
                                         var data = doc.data() as Map<String, dynamic>;
@@ -329,7 +324,7 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
                       child: const Center(child: Text("Select a date to view shift status")),
                     ),
 
-              // 3. Leave Requests (Scrollable Version)
+              // 3. Leave Requests
               _buildCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -345,17 +340,15 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
                     
                     // Fixed height container to enable internal scrolling
                     SizedBox(
-                      height: 300, // Set the height you want for the scrollable area
+                      height: 300, 
                       child: StreamBuilder<QuerySnapshot>(
-                        // 1. Fetching leave requests specific to this employee
                         stream: FirebaseFirestore.instance
                             .collection('leaves')
-                            .where('deptCode', isEqualTo: widget.deptCode) // Using widget.employeeID from your class
+                            .where('deptCode', isEqualTo: widget.deptCode)
                             .where('leaveDate', isGreaterThanOrEqualTo: Timestamp.fromDate(DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day, 0, 0, 0)))
                             .orderBy('leaveDate', descending: false)  // Newest requests on top
                             .snapshots(),
                         builder: (context, snapshot) {
-                          // 2. Handle Loading & Errors
                           if (snapshot.hasError) {
                             debugPrint("$snapshot.error");
                           }
@@ -365,7 +358,7 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
                       
                           final leaveDocs = snapshot.data?.docs ?? [];
                       
-                          // 3. Handle Empty State (UX Polish)
+                          // Handle Empty State
                           if (leaveDocs.isEmpty) {
                             return const Center(
                               child: Text("No leave requests found.", 
@@ -373,7 +366,6 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
                             );
                           }
                       
-                          // 4. Build the dynamic list
                           return Scrollbar(
                             controller: _leaveScrollController,
                             thumbVisibility: true,
@@ -440,7 +432,7 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
                     }
                   }
 
-                  // A nested StreamBuilder specifically to count department-wide pending leaves
+                  // Count department-wide pending leaves
                   return _buildCard(
                     child: Column(
                       children: [
@@ -486,7 +478,7 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
     );
   }
 
-  // --- Shift Assignment ---
+  // --- SHIFT ASSIGNING ---
   // Helper for Building Employee Rows
   Widget _buildEmployeeRow(String name, String status, String employeeID) {
     return Padding(
@@ -508,7 +500,7 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
       case 'none':
         return SizedBox(
           height: 30,
-          width: 100,
+          width: 120,
           child: ElevatedButton(
             onPressed: _isOffline ? null : () => _assignShiftAction(employeeID, employeeName),
             style: ElevatedButton.styleFrom(
@@ -580,7 +572,7 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
     }
   }
 
-  // Feature - Assign shift to a employee
+  // Feature - Assign shift to an employee
   void _assignShiftAction(String employeeID, String employeeName) {
     showDialog(
       context: context,
@@ -634,7 +626,6 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
             // Confirm Shift
             ElevatedButton(
               onPressed: () async {
-              // Mapping your local variables to the function parameters
               await _submitShiftToFirestore(
                 employeeID: employeeID, 
                 taskName: _taskController.text
@@ -697,7 +688,7 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
         'shiftUserID': employeeID,
         'shiftUserName': fullName,
         'shiftTask': taskName,
-        'deptCode': widget.deptCode, // Using widget.deptCode from the constructor
+        'deptCode': widget.deptCode,
         'createdAt': FieldValue.serverTimestamp(),
       });
     } catch (e) {
@@ -720,8 +711,8 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
             ),
             ElevatedButton(
               onPressed: () {
-                Navigator.pop(context); // Close dialog
-                _removeShiftAction(employeeID);       // Run the reset logic
+                Navigator.pop(context);
+                _removeShiftAction(employeeID);
               },
               style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black),
               child: const Text("Confirm"),
@@ -768,7 +759,6 @@ class _ManagerSchedulePageState extends State<ManagerSchedule> {
     );
   }
 
-  // 1. Create a helper function to avoid code duplication
   void _updateStreams(DateTime date) {
     // Force the range to cover the FULL day
     DateTime start = DateTime(date.year, date.month, date.day, 0, 0, 0);

@@ -37,12 +37,9 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
   bool _isOffline = false;
 
   final FirebaseFirestore _db = FirebaseFirestore.instance;
-  int notifyShift = 0;
-  bool notifyCheckIn = false;
-  bool notifyLate = false;
-  bool notifyAbsent = false;
-  String userRole = "";
   
+  // Personal Information
+  String userRole = "";
   String docID = "Unknown";
   String deptCode = "Loading...";
   String fName = "First Name";
@@ -50,21 +47,28 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
   String email = "Email";
   String contact = "0XX-XXXXXXX";
 
-  bool isWaitingForVerification = false;
+  // Notification Settings
+  int notifyShift = 0;
+  bool notifyCheckIn = false;
+  bool notifyLate = false;
+  bool notifyAbsent = false;
 
+  // Office Location
   double? selectedLat;
   double? selectedLng;
   String addressName = "Unknown Location";
   double? currentDistance;
 
-  // New settings state
+  // Attendance Settings
   bool requireGPS = true;
   bool requireFace = true;
   int? gracePeriod;
   int? radiusMeter;
   GeoPoint? officeLocation;
+
   // ignore: unused_field
   bool _isLoadingSettings = true;
+  bool isWaitingForVerification = false;
 
   int _expandedIndex = 0;
 
@@ -110,11 +114,11 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
   
     if (userDoc.exists) {
       setState(() {
-        // Get the deptCode from the user document
+        // get the deptCode from the user document
         deptCode = userDoc.get('deptCode') ?? ""; 
       });
       
-      // Step 2: Now that we have the code, get the office location
+      // get the office location
       if (deptCode.isNotEmpty) {
         await _loadOfficeData();
       }
@@ -168,7 +172,6 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
       await _loadManagerData(); 
     }
     try {
-      // 1. Get the document from the 'departments' collection
       DocumentSnapshot deptDoc = await _db.collection('departments').doc(deptCode).get();
 
       if (deptDoc.exists && deptDoc.data() != null) {
@@ -176,15 +179,14 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
 
         debugPrint("DEBUG: Found department: ${deptDoc.id}");
 
-        // 1. Get the nested map first
+        // Get the nested map
         Map<String, dynamic>? attendanceSettings = data['attendanceSettings'] as Map<String, dynamic>?;
 
-        // 2. Extract the values from that map
         if (attendanceSettings != null) {
           GeoPoint? geoPoint = attendanceSettings['officeLocation']; 
           String? savedAddress = attendanceSettings['officeAddress'];
 
-          // 3. Update the UI state
+          // Update the UI state
           setState(() {
             if (geoPoint != null) {
               selectedLat = geoPoint.latitude;
@@ -272,7 +274,7 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                 ),
               ),
 
-              // 2. Expandable Account Settings Card
+              // Expandable Account Settings Card
               _buildCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -559,7 +561,7 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                 ),
               ),
 
-              // 2. Expandable Department Settings Card
+              // Expandable Department Settings Card
               _buildCard(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -586,7 +588,7 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      addressName, // This will now show the Firestore value on load
+                                      addressName,
                                       style: const TextStyle(fontSize: 16, color: Colors.black87),
                                     ),
                                     const SizedBox(height: 10),
@@ -657,19 +659,16 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
                       expandedChild: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                        // Verification
+                        // Verification Requirement
                           const Text("Verification Requirement", 
                               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color.fromARGB(255, 40, 75, 158))),
                           const SizedBox(height: 10),
                           _buildSwitchOption("Require GPS Verification", requireGPS, (val) => setState(() => requireGPS = val)),
                           _buildSwitchOption("Require Face Verification", requireFace, (val) => setState(() => requireFace = val)),
 
-                        // Face Verification
                           const Text("Attendance Settings", 
                               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color.fromARGB(255, 40, 75, 158))),
                           const SizedBox(height: 10),
-
-                        // Grace Period
                           ListTile(
                             title: const Text("Grace Period"),
                             trailing: SizedBox(
@@ -862,15 +861,23 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
 
   void _cancelEdit() {
     setState(() {
-      // 1. Reset text controllers to the original variables fetched from Firestore
+      // Reset text controllers to the original variables fetched from Firestore
       _profileFNameController.text = fName;
       _profileLNameController.text = lName;
       _profileEmailController.text = email;
       _profileContactController.text = contact;
 
-      // 2. Collapse the card
+      // Collapse the card
       _expandedIndex = 0;
     });
+  }
+
+  // Helper to clean up after successful update
+  void _onSuccessUpdate() {
+    _showSnackBar("Password updated successfully!", Colors.green);
+    _newPasswordController.clear();
+    _confirmPasswordController.clear();
+    setState(() => _expandedIndex = 0);
   }
 
   // --- ACCOUNT SETTINGS ---
@@ -882,15 +889,13 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
       String oldEmail = user?.email ?? "";
       bool emailChanged = (user != null && newEmail != oldEmail);
 
-      // 2. Update Firestore for other fields
       await FirebaseFirestore.instance.collection('users').doc(docID).update({
         'userFName': _profileFNameController.text.trim(),
         'userLName': _profileLNameController.text.trim(),
         'userContact': _profileContactController.text.trim(),
       });
 
-      
-      // 1. If email changed, handle Auth verification
+      // If email changed, handle Auth verification
       if (emailChanged) {
         try {
           await user.verifyBeforeUpdateEmail(newEmail);
@@ -906,7 +911,6 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
           }
         }
       }
-
       _showSnackBar("Profile updated successfully!", Colors.green);
       setState(() => _expandedIndex = -1); // Close card
     } catch (e) {
@@ -929,8 +933,8 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
             ),
             ElevatedButton(
               onPressed: () {
-                Navigator.pop(context); // Close dialog
-                _saveProfile();       // Run the reset logic
+                Navigator.pop(context);
+                _saveProfile();
               },
               style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black),
               child: const Text("Confirm"),
@@ -946,7 +950,7 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
     try {
       User? user = FirebaseAuth.instance.currentUser;
       
-      // This is the key command—it forces a fetch from Firebase Auth
+      // forces a fetch from Firebase Auth
       await user?.reload(); 
 
       if (user?.emailVerified ?? false) {
@@ -1076,7 +1080,7 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
           try {
             // 2. Create the credential
             AuthCredential credential = EmailAuthProvider.credential(
-              email: email, // Uses the 'email' variable loaded in _loadEmployeeData
+              email: email,
               password: currentPassword,
             );
 
@@ -1133,14 +1137,6 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
     );
   }
 
-  // Helper to clean up after successful update
-  void _onSuccessUpdate() {
-    _showSnackBar("Password updated successfully!", Colors.green);
-    _newPasswordController.clear();
-    _confirmPasswordController.clear();
-    setState(() => _expandedIndex = 0);
-  }
-
   // --- NOTIFICATION SETTINGS ---
   Future<void> _saveNotification() async {
     try {
@@ -1173,7 +1169,7 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
           .update({
         'attendanceSettings.officeLocation': GeoPoint(selectedLat!, selectedLng!),
         'attendanceSettings.officeAddress': addressName,
-        'updatedAt': FieldValue.serverTimestamp(),
+        'lastUpdated': FieldValue.serverTimestamp(),
       });
 
       _showSnackBar("Office location updated successfully!", Colors.green);
@@ -1184,13 +1180,11 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
   }
 
   Future<void> _pickLocationFromMap(BuildContext context) async {
-    // Navigate to the screen we created in the previous step
     final result = await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const LocationPicker()),
     );
 
-    // If the user picked a location and didn't just press 'back'
     if (result != null && result is Map<String, dynamic>) {
       // check what is actually coming back from the location_picker
       debugPrint("Map Result Recieved: $result");
@@ -1199,7 +1193,6 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
         selectedLat = result['lat'];
         selectedLng = result['lng'];
 
-        // If you have an address controller, you can update it here too:
         var incomingAddress = result['address'];
 
         if (incomingAddress is String && incomingAddress.isNotEmpty && incomingAddress != "{}") {
@@ -1231,19 +1224,15 @@ class _ManagerProfilePageState extends State<ManagerProfile> {
     });
 
     // Start a 3-second countdown to hide the text
-    Future.delayed(const Duration(seconds: 5), () {
+    Future.delayed(const Duration(seconds: 3), () {
       if (mounted) { // Safety check to ensure page is still open
         setState(() {
-          currentDistance = null; // This makes the 'if' condition false
+          currentDistance = null; 
         });
       }
     });
 
-    if (currentDistance! <= 50) {
-      _showSnackBar("Test Passed: ${currentDistance!.toInt()}m away from office!", Colors.green);
-    } else {
-      _showSnackBar("Test Failed: You are ${currentDistance!.toInt()}m away.", Colors.red);
-    }
+    _showSnackBar("Current Distance: You are ${currentDistance!.toInt()}m away from the office.", Colors.blueGrey);
   }
 
   // --- ATTENDANCE SETTINGS ---

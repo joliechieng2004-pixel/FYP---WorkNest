@@ -84,9 +84,8 @@ class _ManagerHomePageState extends State<ManagerHome> {
       );
     }
     
-    // 1. Define the pages
     final List<Widget> pages = [
-      _buildHomeDashboard(deptCode),                         // Index 0 - Home Page
+      _buildHomeDashboard(deptCode),                        // Index 0 - Home Page
       ManagerSchedule(deptCode: deptCode),                  // Index 1 - Schedule Page
       ManagerEmployee(deptCode: deptCode),                  // Index 2 - Employee Page
       ManagerReportPage(deptCode: deptCode),                // Index 3 - Report Page
@@ -95,10 +94,9 @@ class _ManagerHomePageState extends State<ManagerHome> {
 
     return Scaffold(
       backgroundColor: AppColors.bgLightBlue,
-      // 2. Switches body based on the index
       body: pages[_selectedIndex],
 
-      // 3. Fixed Bottom Navigation Bar
+      // Fixed Bottom Navigation Bar
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed, // Required for 5 items
         backgroundColor: const Color(0xFF1A3E88), // Dark Blue
@@ -189,7 +187,7 @@ class _ManagerHomePageState extends State<ManagerHome> {
             const SizedBox(height: 10),
 
             // 4. Report Tab
-            const Text("Company's Attendance Overview", 
+            const Text("Department's Attendance Overview", 
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black)),            
             _buildCard(child: _buildReportsTab()),
 
@@ -243,7 +241,7 @@ class _ManagerHomePageState extends State<ManagerHome> {
   }
 
   Widget _buildTodayOverview(String deptCode) {
-    // 1. Define 'Today' at Midnight for the query
+    // Define 'Today' at Midnight for the query
     DateTime now = DateTime.now();
     Timestamp todayStart = Timestamp.fromDate(DateTime(now.year, now.month, now.day));
 
@@ -256,7 +254,6 @@ class _ManagerHomePageState extends State<ManagerHome> {
       builder: (context, snapshot) {
         if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
 
-        // 2. Calculate Metrics from the snapshot
         int totalPresent = snapshot.data!.docs.length;
         int lateCount = snapshot.data!.docs.where((d) => d['attendanceStatus'] == "Late").length;
         int onTimeCount = snapshot.data!.docs.where((d) => d['attendanceStatus'] == "On-Time").length;
@@ -266,7 +263,7 @@ class _ManagerHomePageState extends State<ManagerHome> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // 3. The Summary Row
+              // The Summary Row
               Row(
                 spacing: 7,
                 children: [
@@ -278,7 +275,7 @@ class _ManagerHomePageState extends State<ManagerHome> {
               
               const SizedBox(height: 30),
               
-              // 5. Quick Actions or Notifications
+              // Quick Actions or Notifications
               if (lateCount > 0)
                 Container(
                   padding: const EdgeInsets.all(15),
@@ -305,15 +302,13 @@ class _ManagerHomePageState extends State<ManagerHome> {
     );
   }
 
-  // --- Start Reporting ---
-
+  // --- PERIOD TOGGLE ---
   Widget _buildPeriodToggle() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 10.0),
       child: SizedBox(
-        width: double.infinity, // Force the container to full width
+        width: double.infinity,
         child: SegmentedButton<String>(
-          // 2. Hide the check icon to keep label centering consistent
           showSelectedIcon: false, 
           segments: const [
             ButtonSegment(
@@ -322,7 +317,7 @@ class _ManagerHomePageState extends State<ManagerHome> {
             ),
             ButtonSegment(
               value: "Weekly", 
-              label: Center(child: Text("Week")), // 3. Wrap label in Center
+              label: Center(child: Text("Week")),
             ),
             ButtonSegment(
               value: "Monthly", 
@@ -342,7 +337,6 @@ class _ManagerHomePageState extends State<ManagerHome> {
           style: SegmentedButton.styleFrom(
             selectedBackgroundColor: AppColors.primaryBlue,
             selectedForegroundColor: AppColors.bgLightBlue,
-            // 4. Ensure visual density is tight
             visualDensity: VisualDensity.comfortable,
             side: const BorderSide(width: 1, color: Colors.grey),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -373,13 +367,13 @@ class _ManagerHomePageState extends State<ManagerHome> {
     }
   }
 
-    Widget _buildReportsTab() {
+  Widget _buildReportsTab() {
     DateTime startDate = _getStartTime(_selectedPeriod);
     
     return SingleChildScrollView(
       child: Column(
         children: [
-          _buildPeriodToggle(), // Moved to the TOP, outside the Stream
+          _buildPeriodToggle(),
 
           const SizedBox(height: 20),
           
@@ -397,10 +391,8 @@ class _ManagerHomePageState extends State<ManagerHome> {
               final docs = snapshot.data!.docs;
               if (docs.isEmpty) return const Center(child: Text("No records found."));
               
-              // 1. Logic: Extract counts into a Map for cleaner access
               final stats = _calculateStats(docs);
               
-              // 2. UI: Return a scrollable view of pre-made components
               return Column(
                 children: [
                   // --- Section 1: Status ---
@@ -411,6 +403,28 @@ class _ManagerHomePageState extends State<ManagerHome> {
                       _buildStatChip("Total", "${stats['total']}", Colors.blue),
                       _buildStatChip("On-Time", "${stats['onTime']}", Colors.green),
                       _buildStatChip("Late", "${stats['late']}", Colors.red),
+                    ],
+                  ),
+                  const SizedBox(height: 5),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.bgLightBlue,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.grey.withOpacity(0.5), width: 5),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text("Extra:", style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey)),
+                              Text("${stats['extra']}", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey.withOpacity(0.8))),
+                            ],
+                          ),
+                        ),
+                      )
                     ],
                   ),
                   const SizedBox(height: 20),
@@ -499,13 +513,11 @@ class _ManagerHomePageState extends State<ManagerHome> {
     int extra = 0;
 
     for (var doc in docs) {
-      // 1. Safely extract the data
       final data = doc.data() as Map<String, dynamic>;
       
-      // 2. Get the status string (default to Unscheduled if null)
       final String status = data['attendanceStatus']?.toString() ?? 'Extra';
 
-      // 3. Increment the correct counter in one single loop
+      // Increment the correct counter in one single loop
       switch (status) {
         case 'On-Time':
           onTime++;
@@ -519,7 +531,7 @@ class _ManagerHomePageState extends State<ManagerHome> {
       }
     }
 
-    // 4. Return everything in a tidy Map
+    // Return everything in a tidy Map
     return {
       'onTime': onTime,
       'late': late,
